@@ -1,10 +1,6 @@
 @page "/"
 @inject IScheduleRepository ScheduleRepository
 
-@{
-    var dashboard = ScheduleRepository.GetDashboard();
-}
-
 <section class="page-title">
     <div>
         <h1>Dashboard</h1>
@@ -13,74 +9,88 @@
     <a class="btn btn-primary" href="appointments">New Appointment</a>
 </section>
 
-<section class="ss-grid kpi-grid">
-    <div class="ss-card kpi">
-        <div class="kpi-label">Today&apos;s appointments</div>
-        <div class="kpi-value">@dashboard.TodayAppointments</div>
-        <span class="pill pill-confirmed">Confirmed flow</span>
-    </div>
-    <div class="ss-card kpi">
-        <div class="kpi-label">Weekly utilization</div>
-        <div class="kpi-value">@dashboard.WeeklyUtilization%</div>
-        <span class="pill pill-scheduled">Team capacity</span>
-    </div>
-    <div class="ss-card kpi">
-        <div class="kpi-label">Pending requests</div>
-        <div class="kpi-value">@dashboard.PendingRequests</div>
-        <span class="pill pill-pending">Needs action</span>
-    </div>
-    <div class="ss-card kpi">
-        <div class="kpi-label">Team available</div>
-        <div class="kpi-value">@dashboard.TeamAvailable</div>
-        <span class="pill pill-available">Bookable now</span>
-    </div>
-</section>
-
-<section class="ss-grid panel-grid mt-4">
-    <div class="ss-card">
-        <div class="calendar-toolbar">
-            <div>
-                <h2 class="h4 mb-1">Upcoming Meetings</h2>
-                <div class="muted">Live operational queue for schedulers and managers.</div>
-            </div>
-            <a class="btn btn-outline-primary btn-sm" href="calendar">Open Calendar</a>
+@if (dashboard is null)
+{
+    <div class="ss-card">Loading dashboard...</div>
+}
+else
+{
+    <section class="ss-grid kpi-grid">
+        <div class="ss-card kpi">
+            <div class="kpi-label">Today&apos;s appointments</div>
+            <div class="kpi-value">@dashboard.TodayAppointments</div>
+            <span class="pill pill-confirmed">Confirmed flow</span>
         </div>
+        <div class="ss-card kpi">
+            <div class="kpi-label">Weekly utilization</div>
+            <div class="kpi-value">@dashboard.WeeklyUtilization%</div>
+            <span class="pill pill-scheduled">Team capacity</span>
+        </div>
+        <div class="ss-card kpi">
+            <div class="kpi-label">Pending requests</div>
+            <div class="kpi-value">@dashboard.PendingRequests</div>
+            <span class="pill pill-pending">Needs action</span>
+        </div>
+        <div class="ss-card kpi">
+            <div class="kpi-label">Team available</div>
+            <div class="kpi-value">@dashboard.TeamAvailable</div>
+            <span class="pill pill-available">Bookable now</span>
+        </div>
+    </section>
 
-        <div class="event-list">
-            @foreach (var item in dashboard.UpcomingMeetings)
-            {
-                <div class="event-row">
-                    <div class="event-main">
-                        <span class="event-bar" style="background:@item.Color"></span>
-                        <div>
-                            <strong>@item.Subject</strong>
-                            <div class="muted">@item.Customer with @item.Employee</div>
+    <section class="ss-grid panel-grid mt-4">
+        <div class="ss-card">
+            <div class="calendar-toolbar">
+                <div>
+                    <h2 class="h4 mb-1">Upcoming Meetings</h2>
+                    <div class="muted">Live operational queue for schedulers and managers.</div>
+                </div>
+                <a class="btn btn-outline-primary btn-sm" href="calendar">Open Calendar</a>
+            </div>
+
+            <div class="event-list">
+                @foreach (var item in dashboard.UpcomingMeetings)
+                {
+                    <div class="event-row">
+                        <div class="event-main">
+                            <span class="event-bar" style="background:@item.Color"></span>
+                            <div>
+                                <strong>@item.Subject</strong>
+                                <div class="muted">@item.Customer with @item.Employee</div>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div>@item.StartsAt.ToString("h:mm tt")</div>
+                            <span class="pill @StatusClass(item.Status)">@item.Status</span>
                         </div>
                     </div>
-                    <div class="text-end">
-                        <div>@item.StartsAt.ToString("h:mm tt")</div>
-                        <span class="pill @StatusClass(item.Status)">@item.Status</span>
-                    </div>
-                </div>
-            }
+                }
+            </div>
         </div>
-    </div>
 
-    <aside class="ss-card">
-        <h2 class="h4 mb-3">Notifications</h2>
-        <div class="notification-list">
-            @foreach (var notification in dashboard.Notifications)
-            {
-                <div class="notification-row d-block">
-                    <strong>@notification.Title</strong>
-                    <p class="muted mb-1">@notification.Message</p>
-                    <small class="muted">@notification.Age</small>
-                </div>
-            }
-        </div>
-    </aside>
-</section>
+        <aside class="ss-card">
+            <h2 class="h4 mb-3">Notifications</h2>
+            <div class="notification-list">
+                @foreach (var notification in dashboard.Notifications)
+                {
+                    <div class="notification-row d-block">
+                        <strong>@notification.Title</strong>
+                        <p class="muted mb-1">@notification.Message</p>
+                        <small class="muted">@notification.Age</small>
+                    </div>
+                }
+            </div>
+        </aside>
+    </section>
+}
 
 @code {
+    private DashboardSnapshot? dashboard;
+
+    protected override async Task OnInitializedAsync()
+    {
+        dashboard = await ScheduleRepository.GetDashboardAsync();
+    }
+
     private static string StatusClass(AppointmentStatus status) => $"pill-{status.ToString().ToLowerInvariant()}";
 }

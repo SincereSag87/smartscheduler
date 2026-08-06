@@ -7,84 +7,265 @@
         <h1>Appointments</h1>
         <p>Create, edit, cancel, complete, reschedule, and manage recurring appointments.</p>
     </div>
-    <button class="btn btn-primary" @onclick="SaveAppointment">Create Appointment</button>
+    <button class="btn btn-primary" @onclick="StartNew">Create Appointment</button>
 </section>
 
 <section class="ss-grid panel-grid">
     <div class="ss-card">
         <h2 class="h4 mb-3">Appointment Queue</h2>
-        <div class="table-responsive">
-            <table class="table align-middle">
-                <thead>
-                    <tr>
-                        <th>Appointment</th>
-                        <th>Customer</th>
-                        <th>Owner</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in ScheduleRepository.GetCalendarEvents())
-                    {
+        @if (appointments.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No appointments found. Create an appointment to populate the schedule.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
                         <tr>
-                            <td><strong>@item.Subject</strong></td>
-                            <td>@item.Customer</td>
-                            <td>@item.Employee</td>
-                            <td>@item.StartsAt.ToString("MMM d, h:mm tt")</td>
-                            <td><span class="pill @StatusClass(item.Status)">@item.Status</span></td>
+                            <th>Appointment</th>
+                            <th>Owner</th>
+                            <th>Type</th>
+                            <th>Time</th>
+                            <th>Status</th>
+                            <th></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in appointments)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@item.Subject</strong>
+                                    <div class="muted">@item.Customer &lt;@item.CustomerEmail&gt;</div>
+                                </td>
+                                <td>@item.Employee</td>
+                                <td>
+                                    @item.AppointmentType
+                                    <div class="muted">@item.Location</div>
+                                </td>
+                                <td>
+                                    @item.StartsAt.ToString("MMM d, h:mm tt")
+                                    <div class="muted">@((item.EndsAt - item.StartsAt).TotalMinutes) min @(item.IsRecurring ? "recurring" : "")</div>
+                                </td>
+                                <td><span class="pill @StatusClass(item.Status)">@item.Status</span></td>
+                                <td class="text-end actions-cell">
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => EditAppointment(item.Id)">Edit</button>
+                                    <button class="btn btn-outline-primary btn-sm" @onclick="() => RescheduleAppointment(item.Id)">Reschedule</button>
+                                    <button class="btn btn-outline-success btn-sm" @onclick="() => SetStatus(item.Id, AppointmentStatus.Completed)">Complete</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => SetStatus(item.Id, AppointmentStatus.Cancelled)">Cancel</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 
     <aside class="ss-card">
-        <h2 class="h4 mb-3">Booking Form</h2>
+        <h2 class="h4 mb-3">@FormTitle</h2>
+        @if (!CanCreateAppointments)
+        {
+            <div class="alert alert-warning">Employees, appointment types, and locations are required before booking.</div>
+        }
         <div class="form-card">
             <div>
                 <label class="form-label" for="subject">Subject</label>
-                <input id="subject" class="form-control" @bind="draftSubject" />
+                <input id="subject" class="form-control" @bind="editor.Subject" />
             </div>
             <div>
                 <label class="form-label" for="customer">Customer</label>
-                <input id="customer" class="form-control" @bind="draftCustomer" />
+                <input id="customer" class="form-control" @bind="editor.CustomerName" />
+            </div>
+            <div>
+                <label class="form-label" for="customer-email">Customer email</label>
+                <input id="customer-email" type="email" class="form-control" @bind="editor.CustomerEmail" />
             </div>
             <div>
                 <label class="form-label" for="owner">Team member</label>
-                <select id="owner" class="form-select" @bind="draftOwner">
-                    <option>Maya Chen</option>
-                    <option>Diego Ramos</option>
-                    <option>Priya Shah</option>
-                    <option>Lena Ortiz</option>
+                <select id="owner" class="form-select" @bind="editor.EmployeeId">
+                    @foreach (var employee in options.Employees)
+                    {
+                        <option value="@employee.Id">@employee.FullName</option>
+                    }
                 </select>
             </div>
             <div>
+                <label class="form-label" for="appointment-type">Type</label>
+                <select id="appointment-type" class="form-select" @bind="editor.AppointmentTypeId">
+                    @foreach (var type in options.AppointmentTypes)
+                    {
+                        <option value="@type.Id">@type.Name (@type.DurationMinutes min)</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="location">Location</label>
+                <select id="location" class="form-select" @bind="editor.LocationId">
+                    @foreach (var location in options.Locations)
+                    {
+                        <option value="@location.Id">@location.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="start-date">Date</label>
+                <input id="start-date" type="date" class="form-control" @bind="startDate" />
+            </div>
+            <div>
+                <label class="form-label" for="start-time">Start</label>
+                <input id="start-time" type="time" class="form-control" value="@startTime" @onchange="UpdateStartTime" />
+            </div>
+            <div>
+                <label class="form-label" for="duration">Duration</label>
+                <input id="duration" type="number" min="15" step="15" class="form-control" @bind="durationMinutes" />
+            </div>
+            <div>
                 <label class="form-label" for="status">Status</label>
-                <select id="status" class="form-select" @bind="draftStatus">
-                    <option>Scheduled</option>
-                    <option>Confirmed</option>
-                    <option>Pending</option>
-                    <option>Cancelled</option>
-                    <option>Completed</option>
+                <select id="status" class="form-select" @bind="editor.Status">
+                    @foreach (var status in Enum.GetValues<AppointmentStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
                 </select>
             </div>
         </div>
-        <div class="alert alert-info mt-3 mb-0">@saveMessage</div>
+        <div class="form-check form-switch mt-3">
+            <input id="recurring" class="form-check-input" type="checkbox" @bind="editor.IsRecurring" />
+            <label class="form-check-label" for="recurring">Recurring appointment</label>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" disabled="@(!CanCreateAppointments)" @onclick="SaveAppointment">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="StartNew">Reset</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
     </aside>
 </section>
 
 @code {
-    private string draftSubject = "Discovery call";
-    private string draftCustomer = "New account";
-    private string draftOwner = "Maya Chen";
-    private string draftStatus = "Scheduled";
-    private string saveMessage = "Ready to create a new appointment.";
+    private List<AppointmentListItem> appointments = [];
+    private AppointmentFormOptions options = new([], [], []);
+    private AppointmentEditor editor = new();
+    private DateTime startDate = DateTime.Today.AddDays(1);
+    private string startTime = "09:00";
+    private int durationMinutes = 30;
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
 
-    private void SaveAppointment()
+    private string FormTitle => editor.Id == 0 ? "Booking Form" : "Edit Appointment";
+    private bool CanCreateAppointments => options.Employees.Count > 0 && options.AppointmentTypes.Count > 0 && options.Locations.Count > 0;
+
+    protected override async Task OnInitializedAsync()
     {
-        saveMessage = $"{draftSubject} for {draftCustomer} assigned to {draftOwner} as {draftStatus}.";
+        await LoadData();
+        await StartNew();
+    }
+
+    private async Task LoadData()
+    {
+        options = await ScheduleRepository.GetAppointmentFormOptionsAsync();
+        appointments = (await ScheduleRepository.GetAppointmentsAsync()).ToList();
+    }
+
+    private async Task StartNew()
+    {
+        editor = await ScheduleRepository.GetAppointmentEditorAsync();
+        ApplyEditorScheduleToForm();
+        message = "Ready to create a new appointment.";
+        messageClass = "alert-info";
+    }
+
+    private async Task EditAppointment(int id)
+    {
+        editor = await ScheduleRepository.GetAppointmentEditorAsync(id);
+        ApplyEditorScheduleToForm();
+        message = "Editing existing appointment.";
+        messageClass = "alert-info";
+    }
+
+    private async Task SaveAppointment()
+    {
+        if (!ValidateAppointment())
+        {
+            return;
+        }
+
+        ApplyFormScheduleToEditor();
+        await ScheduleRepository.SaveAppointmentAsync(editor);
+        await LoadData();
+        await StartNew();
+        SetMessage("Appointment saved.", "alert-success");
+    }
+
+    private async Task SetStatus(int id, AppointmentStatus status)
+    {
+        await ScheduleRepository.UpdateAppointmentStatusAsync(id, status);
+        await LoadData();
+        SetMessage($"Appointment marked {status}.", "alert-success");
+    }
+
+    private async Task RescheduleAppointment(int id)
+    {
+        var item = appointments.FirstOrDefault(appointment => appointment.Id == id);
+        if (item is null)
+        {
+            return;
+        }
+
+        await ScheduleRepository.RescheduleAppointmentAsync(id, item.StartsAt.AddDays(1));
+        await LoadData();
+        SetMessage("Appointment rescheduled to the same time tomorrow.", "alert-success");
+    }
+
+    private void ApplyEditorScheduleToForm()
+    {
+        startDate = editor.StartsAt.Date;
+        startTime = editor.StartsAt.ToString("HH:mm");
+        durationMinutes = Math.Max((int)(editor.EndsAt - editor.StartsAt).TotalMinutes, 15);
+    }
+
+    private void ApplyFormScheduleToEditor()
+    {
+        var parsedTime = TimeOnly.Parse(startTime);
+        editor.StartsAt = startDate.Date.Add(parsedTime.ToTimeSpan());
+        editor.EndsAt = editor.StartsAt.AddMinutes(durationMinutes);
+    }
+
+    private void UpdateStartTime(ChangeEventArgs args)
+    {
+        startTime = args.Value?.ToString() ?? "09:00";
+    }
+
+    private bool ValidateAppointment()
+    {
+        if (string.IsNullOrWhiteSpace(editor.Subject) ||
+            string.IsNullOrWhiteSpace(editor.CustomerName) ||
+            string.IsNullOrWhiteSpace(editor.CustomerEmail) ||
+            editor.EmployeeId == 0 ||
+            editor.AppointmentTypeId == 0 ||
+            editor.LocationId == 0)
+        {
+            SetMessage("Subject, customer, email, employee, type, and location are required.", "alert-warning");
+            return false;
+        }
+
+        if (!TimeOnly.TryParse(startTime, out _) || durationMinutes < 15)
+        {
+            SetMessage("Start time and duration must be valid.", "alert-warning");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SetMessage(string text, string cssClass)
+    {
+        message = text;
+        messageClass = cssClass;
     }
 
     private static string StatusClass(AppointmentStatus status) => $"pill-{status.ToString().ToLowerInvariant()}";
