@@ -1,37 +1,95 @@
 @page "/team"
-@inject IScheduleRepository ScheduleRepository
+@inject ITeamManagementService TeamService
 
 <section class="page-title">
     <div>
         <h1>Team Scheduling</h1>
         <p>Employees, departments, working hours, time off, and daily availability.</p>
     </div>
-    <button class="btn btn-primary">Add Employee</button>
+    <a class="btn btn-primary" href="employees">Add Employee</a>
 </section>
 
-<section class="ss-card">
-    <div class="team-list">
-        @foreach (var member in ScheduleRepository.GetTeamSchedules())
-        {
-            <div class="team-row">
-                <div>
-                    <strong>@member.Name</strong>
-                    <div class="muted">@member.Department</div>
-                </div>
-                <div>@member.WorkingHours</div>
-                <div>@member.AppointmentsToday appointments</div>
-                <span class="pill @AvailabilityClass(member.Availability)">@member.Availability</span>
-            </div>
-        }
+<section class="ss-grid kpi-grid mb-4">
+    <div class="ss-card kpi">
+        <div class="kpi-label">Employees</div>
+        <div class="kpi-value">@employees.Count</div>
+        <span class="pill pill-confirmed">@employees.Count(employee => employee.IsActive) active</span>
+    </div>
+    <div class="ss-card kpi">
+        <div class="kpi-label">Departments</div>
+        <div class="kpi-value">@departments.Count</div>
+        <span class="pill pill-scheduled">Scheduling groups</span>
+    </div>
+    <div class="ss-card kpi">
+        <div class="kpi-label">Coverage</div>
+        <div class="kpi-value">@CoveragePercent%</div>
+        <span class="pill pill-available">Available capacity</span>
     </div>
 </section>
 
-@code {
-    private static string AvailabilityClass(AvailabilityStatus status) =>
-        status switch
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <div class="calendar-toolbar">
+            <div>
+                <h2 class="h4 mb-1">Team Availability</h2>
+                <div class="muted">Live employee records from SQL Server through Entity Framework Core.</div>
+            </div>
+            <a class="btn btn-outline-primary btn-sm" href="departments">Manage Departments</a>
+        </div>
+
+        @if (employees.Count == 0)
         {
-            AvailabilityStatus.Available => "pill-available",
-            AvailabilityStatus.Busy => "pill-busy",
-            _ => "pill-timeoff"
-        };
+            <div class="alert alert-info mb-0">No employees found. Add employees to populate team availability.</div>
+        }
+        else
+        {
+            <div class="team-list">
+                @foreach (var employee in employees)
+                {
+                    <div class="team-row">
+                        <div>
+                            <strong>@employee.FullName</strong>
+                            <div class="muted">@employee.Department?.Name</div>
+                        </div>
+                        <div>@employee.WorkdayStart.ToString("h:mm tt") - @employee.WorkdayEnd.ToString("h:mm tt")</div>
+                        <div>@employee.Role</div>
+                        <span class="pill @(employee.IsActive ? "pill-available" : "pill-timeoff")">
+                            @(employee.IsActive ? "Available" : "Inactive")
+                        </span>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">Departments</h2>
+        <div class="notification-list">
+            @foreach (var department in departments)
+            {
+                <div class="notification-row">
+                    <div>
+                        <strong>@department.Name</strong>
+                        <div class="muted">@department.Employees.Count employees</div>
+                    </div>
+                    <span class="color-swatch" style="background:@department.Color"></span>
+                </div>
+            }
+        </div>
+    </aside>
+</section>
+
+@code {
+    private List<Employee> employees = [];
+    private List<Department> departments = [];
+
+    private int CoveragePercent => employees.Count == 0
+        ? 0
+        : (int)Math.Round(employees.Count(employee => employee.IsActive) / (double)employees.Count * 100);
+
+    protected override async Task OnInitializedAsync()
+    {
+        departments = (await TeamService.GetDepartmentsAsync()).ToList();
+        employees = (await TeamService.GetEmployeesAsync()).ToList();
+    }
 }

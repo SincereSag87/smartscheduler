@@ -1,0 +1,231 @@
+@page "/employees"
+@rendermode InteractiveServer
+@inject ITeamManagementService TeamService
+
+<section class="page-title">
+    <div>
+        <h1>Employees</h1>
+        <p>Manage staff profiles, role assignments, working hours, and active scheduling status.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="StartNew">New Employee</button>
+</section>
+
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">Employee Directory</h2>
+        @if (employees.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No employees found. Add employees after departments are available.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Department</th>
+                            <th>Hours</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var employee in employees)
+                        {
+                            <tr>
+                                <td>
+                                    <strong>@employee.FullName</strong>
+                                    <div class="muted">@employee.Email</div>
+                                </td>
+                                <td>@employee.Role</td>
+                                <td>@employee.Department?.Name</td>
+                                <td>@employee.WorkdayStart.ToString("h:mm tt") - @employee.WorkdayEnd.ToString("h:mm tt")</td>
+                                <td>
+                                    <span class="pill @(employee.IsActive ? "pill-confirmed" : "pill-cancelled")">
+                                        @(employee.IsActive ? "Active" : "Inactive")
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditEmployee(employee)">Edit</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteEmployee(employee.Id)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">@FormTitle</h2>
+        @if (departments.Count == 0)
+        {
+            <div class="alert alert-warning">Create a department before adding employees.</div>
+        }
+        <div class="form-card">
+            <div>
+                <label class="form-label" for="employee-name">Full name</label>
+                <input id="employee-name" class="form-control" @bind="editor.FullName" />
+            </div>
+            <div>
+                <label class="form-label" for="employee-email">Email</label>
+                <input id="employee-email" type="email" class="form-control" @bind="editor.Email" />
+            </div>
+            <div>
+                <label class="form-label" for="employee-role">Role</label>
+                <input id="employee-role" class="form-control" @bind="editor.Role" />
+            </div>
+            <div>
+                <label class="form-label" for="employee-department">Department</label>
+                <select id="employee-department" class="form-select" @bind="editor.DepartmentId">
+                    @foreach (var department in departments)
+                    {
+                        <option value="@department.Id">@department.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="employee-start">Start</label>
+                <input id="employee-start" type="time" class="form-control" value="@workdayStart" @onchange="UpdateWorkdayStart" />
+            </div>
+            <div>
+                <label class="form-label" for="employee-end">End</label>
+                <input id="employee-end" type="time" class="form-control" value="@workdayEnd" @onchange="UpdateWorkdayEnd" />
+            </div>
+        </div>
+        <div class="form-check form-switch mt-3">
+            <input id="employee-active" class="form-check-input" type="checkbox" @bind="editor.IsActive" />
+            <label class="form-check-label" for="employee-active">Active for scheduling</label>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" disabled="@(departments.Count == 0)" @onclick="SaveEmployee">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="StartNew">Reset</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
+    </aside>
+</section>
+
+@code {
+    private List<Employee> employees = [];
+    private List<Department> departments = [];
+    private Employee editor = NewEmployee();
+    private string workdayStart = "08:30";
+    private string workdayEnd = "17:00";
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    private string FormTitle => editor.Id == 0 ? "Add Employee" : "Edit Employee";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        StartNew();
+    }
+
+    private async Task LoadData()
+    {
+        departments = (await TeamService.GetDepartmentsAsync()).ToList();
+        employees = (await TeamService.GetEmployeesAsync()).ToList();
+    }
+
+    private void StartNew()
+    {
+        editor = NewEmployee();
+        editor.DepartmentId = departments.FirstOrDefault()?.Id ?? 0;
+        workdayStart = editor.WorkdayStart.ToString("HH:mm");
+        workdayEnd = editor.WorkdayEnd.ToString("HH:mm");
+        message = string.Empty;
+    }
+
+    private void EditEmployee(Employee employee)
+    {
+        editor = new Employee
+        {
+            Id = employee.Id,
+            FullName = employee.FullName,
+            Email = employee.Email,
+            Role = employee.Role,
+            DepartmentId = employee.DepartmentId,
+            WorkdayStart = employee.WorkdayStart,
+            WorkdayEnd = employee.WorkdayEnd,
+            IsActive = employee.IsActive
+        };
+        workdayStart = employee.WorkdayStart.ToString("HH:mm");
+        workdayEnd = employee.WorkdayEnd.ToString("HH:mm");
+        message = string.Empty;
+    }
+
+    private async Task SaveEmployee()
+    {
+        if (!ValidateEmployee())
+        {
+            return;
+        }
+
+        editor.WorkdayStart = TimeOnly.Parse(workdayStart);
+        editor.WorkdayEnd = TimeOnly.Parse(workdayEnd);
+
+        await TeamService.SaveEmployeeAsync(editor);
+        SetMessage("Employee saved.", "alert-success");
+        await LoadData();
+        StartNew();
+    }
+
+    private async Task DeleteEmployee(int id)
+    {
+        await TeamService.DeleteEmployeeAsync(id);
+        SetMessage("Employee deleted.", "alert-success");
+        await LoadData();
+        StartNew();
+    }
+
+    private void UpdateWorkdayStart(ChangeEventArgs args)
+    {
+        workdayStart = args.Value?.ToString() ?? "08:30";
+    }
+
+    private void UpdateWorkdayEnd(ChangeEventArgs args)
+    {
+        workdayEnd = args.Value?.ToString() ?? "17:00";
+    }
+
+    private bool ValidateEmployee()
+    {
+        if (string.IsNullOrWhiteSpace(editor.FullName) ||
+            string.IsNullOrWhiteSpace(editor.Email) ||
+            string.IsNullOrWhiteSpace(editor.Role) ||
+            editor.DepartmentId == 0)
+        {
+            SetMessage("Name, email, role, and department are required.", "alert-warning");
+            return false;
+        }
+
+        if (!TimeOnly.TryParse(workdayStart, out var start) ||
+            !TimeOnly.TryParse(workdayEnd, out var end) ||
+            start >= end)
+        {
+            SetMessage("Working hours must have a valid start before end.", "alert-warning");
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SetMessage(string text, string cssClass)
+    {
+        message = text;
+        messageClass = cssClass;
+    }
+
+    private static Employee NewEmployee() => new()
+    {
+        Role = "Scheduler",
+        IsActive = true
+    };
+}

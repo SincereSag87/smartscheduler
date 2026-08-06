@@ -1,0 +1,146 @@
+@page "/departments"
+@rendermode InteractiveServer
+@inject ITeamManagementService TeamService
+
+<section class="page-title">
+    <div>
+        <h1>Departments</h1>
+        <p>Create and maintain the operational teams that own schedules and appointments.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="StartNew">New Department</button>
+</section>
+
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">Department Directory</h2>
+        @if (departments.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No departments found. Add the first department to start scheduling teams.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Color</th>
+                            <th>Employees</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var department in departments)
+                        {
+                            <tr>
+                                <td><strong>@department.Name</strong></td>
+                                <td>
+                                    <span class="color-swatch" style="background:@department.Color"></span>
+                                    @department.Color
+                                </td>
+                                <td>@department.Employees.Count</td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditDepartment(department)">Edit</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteDepartment(department.Id)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">@FormTitle</h2>
+        <div class="mb-3">
+            <label class="form-label" for="department-name">Name</label>
+            <input id="department-name" class="form-control" @bind="editor.Name" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="department-color">Color</label>
+            <input id="department-color" type="color" class="form-control form-control-color" @bind="editor.Color" />
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" @onclick="SaveDepartment">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="StartNew">Reset</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
+    </aside>
+</section>
+
+@code {
+    private List<Department> departments = [];
+    private Department editor = NewDepartment();
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    private string FormTitle => editor.Id == 0 ? "Add Department" : "Edit Department";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDepartments();
+    }
+
+    private async Task LoadDepartments()
+    {
+        departments = (await TeamService.GetDepartmentsAsync()).ToList();
+    }
+
+    private void StartNew()
+    {
+        editor = NewDepartment();
+        message = string.Empty;
+    }
+
+    private void EditDepartment(Department department)
+    {
+        editor = new Department
+        {
+            Id = department.Id,
+            Name = department.Name,
+            Color = department.Color
+        };
+        message = string.Empty;
+    }
+
+    private async Task SaveDepartment()
+    {
+        if (string.IsNullOrWhiteSpace(editor.Name))
+        {
+            SetMessage("Department name is required.", "alert-warning");
+            return;
+        }
+
+        await TeamService.SaveDepartmentAsync(editor);
+        SetMessage("Department saved.", "alert-success");
+        editor = NewDepartment();
+        await LoadDepartments();
+    }
+
+    private async Task DeleteDepartment(int id)
+    {
+        var result = await TeamService.DeleteDepartmentAsync(id);
+        SetMessage(result switch
+        {
+            DeleteResult.Deleted => "Department deleted.",
+            DeleteResult.HasRelatedRecords => "Move employees out of this department before deleting it.",
+            _ => "Department was not found."
+        }, result == DeleteResult.Deleted ? "alert-success" : "alert-warning");
+        await LoadDepartments();
+    }
+
+    private void SetMessage(string text, string cssClass)
+    {
+        message = text;
+        messageClass = cssClass;
+    }
+
+    private static Department NewDepartment() => new()
+    {
+        Color = "#14B8A6"
+    };
+}
