@@ -1,0 +1,111 @@
+.page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--ss-bg);
+}
+
+main {
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar {
+    background: var(--ss-sidebar);
+    box-shadow: 8px 0 24px rgba(15, 76, 92, 0.16);
+}
+
+.top-row {
+    min-height: 72px;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.94);
+    border-bottom: 1px solid var(--ss-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    backdrop-filter: blur(14px);
+}
+
+.eyebrow {
+    color: var(--ss-muted);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    color: var(--ss-muted);
+    font-size: 0.95rem;
+}
+
+.top-actions a {
+    color: var(--ss-primary);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.status-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+    background: var(--ss-success);
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.14);
+}
+
+.content {
+    padding: 1.5rem;
+}
+
+@media (min-width: 800px) {
+    .page {
+        flex-direction: row;
+    }
+
+    .sidebar {
+        width: 280px;
+        min-height: 100vh;
+        position: sticky;
+        top: 0;
+        align-self: flex-start;
+    }
+
+    .content {
+        padding: 2rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .top-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: #fff7ed;
+    border-top: 1px solid #fed7aa;
+    bottom: 0;
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.14);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.8rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}

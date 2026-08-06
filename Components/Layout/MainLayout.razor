@@ -1,0 +1,38 @@
+﻿@inherits LayoutComponentBase
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row">
+            <div>
+                <div class="eyebrow">Enterprise Scheduling</div>
+                <strong>SmartScheduler Command Center</strong>
+            </div>
+            <div class="top-actions">
+                <span class="status-dot"></span>
+                <span>Live sync</span>
+                <AuthorizeView>
+                    <Authorized>
+                        <a href="Account/Manage">@context.User.Identity?.Name</a>
+                    </Authorized>
+                    <NotAuthorized>
+                        <a href="Account/Login">Login</a>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

@@ -1,0 +1,48 @@
+@page "/reports"
+@inject IScheduleRepository ScheduleRepository
+
+<section class="page-title">
+    <div>
+        <h1>Reports</h1>
+        <p>Daily appointments, weekly utilization, monthly trends, and employee schedule performance.</p>
+    </div>
+    <button class="btn btn-outline-primary">Export CSV</button>
+</section>
+
+<section class="ss-grid kpi-grid">
+    @foreach (var metric in ScheduleRepository.GetReportMetrics())
+    {
+        <div class="ss-card">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>@metric.Label</strong>
+                <span class="pill pill-confirmed">@metric.Trend</span>
+            </div>
+            <div class="kpi-value">@metric.Value@(metric.Label.Contains("utilization") || metric.Label.Contains("completion") ? "%" : "")</div>
+            <div class="report-bar">
+                <div class="report-fill" style="width:@Math.Min(metric.Value, 100)%"></div>
+            </div>
+        </div>
+    }
+</section>
+
+<section class="ss-card mt-4">
+    <h2 class="h4 mb-3">Monthly Trends</h2>
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    <th>Appointments</th>
+                    <th>Completed</th>
+                    <th>Cancelled</th>
+                    <th>Utilization</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>May</td><td>642</td><td>592</td><td>21</td><td>78%</td></tr>
+                <tr><td>June</td><td>701</td><td>649</td><td>18</td><td>81%</td></tr>
+                <tr><td>July</td><td>744</td><td>690</td><td>16</td><td>84%</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,0 +1,49 @@
+@page "/calendar"
+@inject IScheduleRepository ScheduleRepository
+
+@{
+    var events = ScheduleRepository.GetCalendarEvents();
+    var start = DateTime.Today;
+}
+
+<section class="page-title">
+    <div>
+        <h1>Calendar</h1>
+        <p>Day, week, and month planning with status-colored appointments.</p>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-primary active">Week</button>
+        <button class="btn btn-outline-primary">Day</button>
+        <button class="btn btn-outline-primary">Month</button>
+    </div>
+</section>
+
+<section class="ss-card">
+    <div class="calendar-toolbar">
+        <div>
+            <h2 class="h4 mb-0">@start.ToString("MMMM yyyy")</h2>
+            <div class="muted">Drag-and-drop scheduling placeholder wired for interactive expansion.</div>
+        </div>
+        <button class="btn btn-primary btn-sm">Book Slot</button>
+    </div>
+
+    <div class="calendar-grid">
+        @for (var offset = 0; offset < 7; offset++)
+        {
+            var day = start.AddDays(offset);
+            <div class="calendar-day">
+                <strong>@day.ToString("ddd")</strong>
+                <div class="muted">@day.ToString("MMM d")</div>
+
+                @foreach (var item in events.Where(e => e.StartsAt.Date == day.Date))
+                {
+                    <div class="calendar-event" draggable="true" style="background:@item.Color">
+                        <strong>@item.StartsAt.ToString("h:mm tt")</strong>
+                        <div>@item.Subject</div>
+                        <small>@item.Employee</small>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</section>

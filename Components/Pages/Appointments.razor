@@ -1,0 +1,91 @@
+@page "/appointments"
+@rendermode InteractiveServer
+@inject IScheduleRepository ScheduleRepository
+
+<section class="page-title">
+    <div>
+        <h1>Appointments</h1>
+        <p>Create, edit, cancel, complete, reschedule, and manage recurring appointments.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="SaveAppointment">Create Appointment</button>
+</section>
+
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">Appointment Queue</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Appointment</th>
+                        <th>Customer</th>
+                        <th>Owner</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in ScheduleRepository.GetCalendarEvents())
+                    {
+                        <tr>
+                            <td><strong>@item.Subject</strong></td>
+                            <td>@item.Customer</td>
+                            <td>@item.Employee</td>
+                            <td>@item.StartsAt.ToString("MMM d, h:mm tt")</td>
+                            <td><span class="pill @StatusClass(item.Status)">@item.Status</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">Booking Form</h2>
+        <div class="form-card">
+            <div>
+                <label class="form-label" for="subject">Subject</label>
+                <input id="subject" class="form-control" @bind="draftSubject" />
+            </div>
+            <div>
+                <label class="form-label" for="customer">Customer</label>
+                <input id="customer" class="form-control" @bind="draftCustomer" />
+            </div>
+            <div>
+                <label class="form-label" for="owner">Team member</label>
+                <select id="owner" class="form-select" @bind="draftOwner">
+                    <option>Maya Chen</option>
+                    <option>Diego Ramos</option>
+                    <option>Priya Shah</option>
+                    <option>Lena Ortiz</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="status">Status</label>
+                <select id="status" class="form-select" @bind="draftStatus">
+                    <option>Scheduled</option>
+                    <option>Confirmed</option>
+                    <option>Pending</option>
+                    <option>Cancelled</option>
+                    <option>Completed</option>
+                </select>
+            </div>
+        </div>
+        <div class="alert alert-info mt-3 mb-0">@saveMessage</div>
+    </aside>
+</section>
+
+@code {
+    private string draftSubject = "Discovery call";
+    private string draftCustomer = "New account";
+    private string draftOwner = "Maya Chen";
+    private string draftStatus = "Scheduled";
+    private string saveMessage = "Ready to create a new appointment.";
+
+    private void SaveAppointment()
+    {
+        saveMessage = $"{draftSubject} for {draftCustomer} assigned to {draftOwner} as {draftStatus}.";
+    }
+
+    private static string StatusClass(AppointmentStatus status) => $"pill-{status.ToString().ToLowerInvariant()}";
+}

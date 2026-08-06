@@ -1,0 +1,37 @@
+@page "/team"
+@inject IScheduleRepository ScheduleRepository
+
+<section class="page-title">
+    <div>
+        <h1>Team Scheduling</h1>
+        <p>Employees, departments, working hours, time off, and daily availability.</p>
+    </div>
+    <button class="btn btn-primary">Add Employee</button>
+</section>
+
+<section class="ss-card">
+    <div class="team-list">
+        @foreach (var member in ScheduleRepository.GetTeamSchedules())
+        {
+            <div class="team-row">
+                <div>
+                    <strong>@member.Name</strong>
+                    <div class="muted">@member.Department</div>
+                </div>
+                <div>@member.WorkingHours</div>
+                <div>@member.AppointmentsToday appointments</div>
+                <span class="pill @AvailabilityClass(member.Availability)">@member.Availability</span>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private static string AvailabilityClass(AvailabilityStatus status) =>
+        status switch
+        {
+            AvailabilityStatus.Available => "pill-available",
+            AvailabilityStatus.Busy => "pill-busy",
+            _ => "pill-timeoff"
+        };
+}
