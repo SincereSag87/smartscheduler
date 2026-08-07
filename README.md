@@ -137,6 +137,8 @@ dotnet run
 
 The default development connection string targets SQL Server LocalDB in `appsettings.json`.
 
+Development startup also seeds demo users, roles, appointments, availability blocks, business hours, and sample configuration. This seeding runs only when `ASPNETCORE_ENVIRONMENT` is `Development`.
+
 ## EF Core Commands
 
 Create a migration:
@@ -156,6 +158,59 @@ Remove the last unapplied migration:
 ```powershell
 dotnet ef migrations remove
 ```
+
+## Azure App Service And Azure SQL
+
+SmartScheduler is designed to deploy cleanly to Azure App Service with Azure SQL Database.
+
+Recommended Azure resources:
+
+- Azure App Service running the .NET 9 stack
+- Azure SQL Database
+- App Service connection string named `DefaultConnection`
+
+Required App Service configuration:
+
+| Setting | Value |
+| --- | --- |
+| `ASPNETCORE_ENVIRONMENT` | `Production` |
+| `ConnectionStrings__DefaultConnection` | Azure SQL connection string |
+| `Database__ApplyMigrationsOnStartup` | `false` by default |
+
+Example Azure SQL connection string shape:
+
+```text
+Server=tcp:<server-name>.database.windows.net,1433;Initial Catalog=<database-name>;Persist Security Info=False;User ID=<user>;Password=<password>;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;
+```
+
+### Production Seeding
+
+Demo users and demo data are intentionally limited to the Development environment. In Production, the application does not create:
+
+- Demo admin, manager, or scheduler accounts
+- Demo appointments
+- Demo availability blocks
+- Demo business hours or closures
+
+Create production users through the Identity UI or a controlled administrative process.
+
+### Migration Strategy
+
+Preferred production strategy:
+
+```powershell
+dotnet ef database update
+```
+
+Run migrations as a release step against the Azure SQL connection string.
+
+Optional App Service startup strategy:
+
+```text
+Database__ApplyMigrationsOnStartup=true
+```
+
+Use this only when you explicitly want the app to apply pending EF Core migrations during startup. The default is `false` to avoid surprise schema changes in Production.
 
 ## What This Demonstrates
 
