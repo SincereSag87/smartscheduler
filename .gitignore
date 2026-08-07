@@ -1,7 +1,12 @@
 bin/
 obj/
+publish/
+publish-check/
 .vs/
 .vscode/
 *.user
 *.suo
 appsettings.*.local.json
+*.db
+*.db-shm
+*.db-wal

@@ -212,6 +212,54 @@ Database__ApplyMigrationsOnStartup=true
 
 Use this only when you explicitly want the app to apply pending EF Core migrations during startup. The default is `false` to avoid surprise schema changes in Production.
 
+## Render Demo Deployment
+
+SmartScheduler can also run as a live demo on Render without Azure by using Docker and SQLite.
+
+This mode is intended for portfolio/demo hosting. It uses:
+
+- Render Web Service
+- Dockerfile in this repository
+- SQLite database file at `/data/smartscheduler.db`
+- Render persistent disk mounted at `/data`
+- Development seeding for demo users and sample data
+
+Render environment variables:
+
+| Key | Value |
+| --- | --- |
+| `ASPNETCORE_ENVIRONMENT` | `Development` |
+| `Database__Provider` | `Sqlite` |
+| `Database__ApplyMigrationsOnStartup` | `true` |
+| `ConnectionStrings__DefaultConnection` | `Data Source=/data/smartscheduler.db` |
+
+The included `render.yaml` defines the same settings and a 1 GB persistent disk.
+
+### Deploy To Render
+
+1. Push this repository to GitHub.
+2. In Render, create a new Blueprint or Web Service from the GitHub repository.
+3. If using the Blueprint flow, Render reads `render.yaml`.
+4. If creating the Web Service manually:
+   - Environment: Docker
+   - Dockerfile path: `./Dockerfile`
+   - Add a persistent disk mounted at `/data`
+   - Add the environment variables listed above
+5. Deploy the service.
+
+After deployment, open the Render URL and log in with:
+
+```text
+admin@smartscheduler.local
+SmartScheduler!2026
+```
+
+Notes:
+
+- SQLite mode uses `EnsureCreated` instead of SQL Server migrations.
+- This avoids Azure SQL for demo hosting.
+- Do not use this SQLite demo configuration for a real production scheduling system.
+
 ## What This Demonstrates
 
 - Building an enterprise Blazor Server application with reusable Razor components

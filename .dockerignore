@@ -1,0 +1,9 @@
+bin/
+obj/
+.git/
+.vs/
+.vscode/
+publish/
+*.user
+*.suo
+smartscheduler.zip
