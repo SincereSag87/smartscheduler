@@ -216,12 +216,11 @@ Use this only when you explicitly want the app to apply pending EF Core migratio
 
 SmartScheduler can also run as a live demo on Render without Azure by using Docker and SQLite.
 
-This mode is intended for portfolio/demo hosting. It uses:
+This mode is intended for portfolio/demo hosting. The free-tier blueprint uses:
 
 - Render Web Service
 - Dockerfile in this repository
-- SQLite database file at `/data/smartscheduler.db`
-- Render persistent disk mounted at `/data`
+- SQLite database file at `/tmp/smartscheduler.db`
 - Development seeding for demo users and sample data
 
 Render environment variables:
@@ -231,9 +230,9 @@ Render environment variables:
 | `ASPNETCORE_ENVIRONMENT` | `Development` |
 | `Database__Provider` | `Sqlite` |
 | `Database__ApplyMigrationsOnStartup` | `true` |
-| `ConnectionStrings__DefaultConnection` | `Data Source=/data/smartscheduler.db` |
+| `ConnectionStrings__DefaultConnection` | `Data Source=/tmp/smartscheduler.db` |
 
-The included `render.yaml` defines the same settings and a 1 GB persistent disk.
+The included `render.yaml` defines the same settings for Render&apos;s free tier.
 
 ### Deploy To Render
 
@@ -243,7 +242,6 @@ The included `render.yaml` defines the same settings and a 1 GB persistent disk.
 4. If creating the Web Service manually:
    - Environment: Docker
    - Dockerfile path: `./Dockerfile`
-   - Add a persistent disk mounted at `/data`
    - Add the environment variables listed above
 5. Deploy the service.
 
@@ -258,6 +256,8 @@ Notes:
 
 - SQLite mode uses `EnsureCreated` instead of SQL Server migrations.
 - This avoids Azure SQL for demo hosting.
+- Free-tier SQLite data is ephemeral and can reset when Render restarts the service.
+- For persistent demo data, upgrade the Render service and mount a disk at `/data`, then use `Data Source=/data/smartscheduler.db`.
 - Do not use this SQLite demo configuration for a real production scheduling system.
 
 ## What This Demonstrates

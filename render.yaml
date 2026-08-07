@@ -4,10 +4,6 @@ services:
     env: docker
     plan: free
     autoDeploy: true
-    disk:
-      name: smartscheduler-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Development
@@ -16,4 +12,4 @@ services:
       - key: Database__ApplyMigrationsOnStartup
         value: true
       - key: ConnectionStrings__DefaultConnection
-        value: Data Source=/data/smartscheduler.db
+        value: Data Source=/tmp/smartscheduler.db
