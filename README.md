@@ -4,6 +4,8 @@ SmartScheduler is an enterprise scheduling and appointment management platform b
 
 The project is designed as a C# portfolio application that demonstrates a realistic business workflow: authenticated users manage schedules, appointments, availability, notifications, reports, audit trails, and administrative configuration from a role-aware Blazor Server interface.
 
+Live demo: https://smartscheduler-3751.onrender.com
+
 ## Tech Stack
 
 - .NET 9 Blazor Web App with server interactivity
