@@ -236,6 +236,31 @@ h4 {
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
+.availability-overlay {
+    margin-top: 0.65rem;
+    padding: 0.55rem;
+    border-radius: 10px;
+    color: var(--ss-text);
+    font-size: 0.82rem;
+    border: 1px dashed var(--ss-border);
+    background: #f1f5f9;
+}
+
+.availability-overlay.busy,
+.availability-overlay.timeoff {
+    background: #fff7ed;
+    border-color: #fdba74;
+}
+
+.availability-overlay.available {
+    background: rgba(20, 184, 166, 0.1);
+    border-color: var(--ss-accent);
+}
+
+.actions-cell {
+    min-width: 280px;
+}
+
 .form-card {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

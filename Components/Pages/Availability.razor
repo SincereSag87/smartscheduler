@@ -1,0 +1,201 @@
+@page "/availability"
+@rendermode InteractiveServer
+@inject IAvailabilityService AvailabilityService
+@inject ITeamManagementService TeamService
+
+<section class="page-title">
+    <div>
+        <h1>Availability</h1>
+        <p>Manage availability, busy blocks, and time off by employee.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="StartNew">New Block</button>
+</section>
+
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">Availability Blocks</h2>
+        @if (blocks.Count == 0)
+        {
+            <div class="alert alert-info mb-0">No availability blocks found.</div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Window</th>
+                            <th>Status</th>
+                            <th>Note</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var block in blocks)
+                        {
+                            <tr>
+                                <td><strong>@block.Employee</strong></td>
+                                <td>
+                                    @block.StartsAt.ToString("MMM d, h:mm tt")
+                                    <div class="muted">to @block.EndsAt.ToString("h:mm tt")</div>
+                                </td>
+                                <td><span class="pill @AvailabilityClass(block.Status)">@block.Status</span></td>
+                                <td>@block.Note</td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditBlock(block.Id)">Edit</button>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => DeleteBlock(block.Id)">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">@FormTitle</h2>
+        @if (employees.Count == 0)
+        {
+            <div class="alert alert-warning">Add employees before creating availability blocks.</div>
+        }
+        <div class="form-card">
+            <div>
+                <label class="form-label" for="employee">Employee</label>
+                <select id="employee" class="form-select" @bind="editor.EmployeeId">
+                    @foreach (var employee in employees)
+                    {
+                        <option value="@employee.Id">@employee.FullName</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="status">Status</label>
+                <select id="status" class="form-select" @bind="editor.Status">
+                    @foreach (var status in Enum.GetValues<AvailabilityStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="form-label" for="start-date">Date</label>
+                <input id="start-date" type="date" class="form-control" @bind="startDate" />
+            </div>
+            <div>
+                <label class="form-label" for="start-time">Start</label>
+                <input id="start-time" type="time" class="form-control" value="@startTime" @onchange="args => startTime = args.Value?.ToString() ?? startTime" />
+            </div>
+            <div>
+                <label class="form-label" for="end-time">End</label>
+                <input id="end-time" type="time" class="form-control" value="@endTime" @onchange="args => endTime = args.Value?.ToString() ?? endTime" />
+            </div>
+            <div>
+                <label class="form-label" for="note">Note</label>
+                <input id="note" class="form-control" @bind="editor.Note" />
+            </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" disabled="@(employees.Count == 0)" @onclick="SaveBlock">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="StartNew">Reset</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
+    </aside>
+</section>
+
+@code {
+    private List<AvailabilityListItem> blocks = [];
+    private List<Employee> employees = [];
+    private AvailabilityEditor editor = new();
+    private DateTime startDate = DateTime.Today.AddDays(1);
+    private string startTime = "12:00";
+    private string endTime = "13:00";
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+
+    private string FormTitle => editor.Id == 0 ? "Add Availability" : "Edit Availability";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+        await StartNew();
+    }
+
+    private async Task LoadData()
+    {
+        employees = (await TeamService.GetEmployeesAsync()).Where(employee => employee.IsActive).ToList();
+        blocks = (await AvailabilityService.GetAvailabilityAsync()).ToList();
+    }
+
+    private async Task StartNew()
+    {
+        editor = await AvailabilityService.GetAvailabilityEditorAsync();
+        if (editor.EmployeeId == 0)
+        {
+            editor.EmployeeId = employees.FirstOrDefault()?.Id ?? 0;
+        }
+        ApplyEditorToForm();
+        message = string.Empty;
+    }
+
+    private async Task EditBlock(int id)
+    {
+        editor = await AvailabilityService.GetAvailabilityEditorAsync(id);
+        ApplyEditorToForm();
+        message = "Editing availability block.";
+        messageClass = "alert-info";
+    }
+
+    private async Task SaveBlock()
+    {
+        if (!TimeOnly.TryParse(startTime, out var start) || !TimeOnly.TryParse(endTime, out var end))
+        {
+            SetMessage("Start and end times must be valid.", "alert-warning");
+            return;
+        }
+
+        editor.StartsAt = startDate.Date.Add(start.ToTimeSpan());
+        editor.EndsAt = startDate.Date.Add(end.ToTimeSpan());
+
+        var result = await AvailabilityService.SaveAvailabilityAsync(editor);
+        SetMessage(result.Message, result.Success ? "alert-success" : "alert-warning");
+        await LoadData();
+        if (result.Success)
+        {
+            await StartNew();
+            SetMessage(result.Message, "alert-success");
+        }
+    }
+
+    private async Task DeleteBlock(int id)
+    {
+        await AvailabilityService.DeleteAvailabilityAsync(id);
+        await LoadData();
+        SetMessage("Availability block deleted.", "alert-success");
+    }
+
+    private void ApplyEditorToForm()
+    {
+        startDate = editor.StartsAt.Date;
+        startTime = editor.StartsAt.ToString("HH:mm");
+        endTime = editor.EndsAt.ToString("HH:mm");
+    }
+
+    private void SetMessage(string text, string cssClass)
+    {
+        message = text;
+        messageClass = cssClass;
+    }
+
+    private static string AvailabilityClass(AvailabilityStatus status) =>
+        status switch
+        {
+            AvailabilityStatus.Available => "pill-available",
+            AvailabilityStatus.Busy => "pill-busy",
+            _ => "pill-timeoff"
+        };
+}

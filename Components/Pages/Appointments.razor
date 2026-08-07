@@ -195,10 +195,13 @@
         }
 
         ApplyFormScheduleToEditor();
-        await ScheduleRepository.SaveAppointmentAsync(editor);
+        var result = await ScheduleRepository.SaveAppointmentAsync(editor);
         await LoadData();
-        await StartNew();
-        SetMessage("Appointment saved.", "alert-success");
+        if (result.Success)
+        {
+            await StartNew();
+        }
+        SetMessage(FormatResultMessage(result), result.Success ? "alert-success" : "alert-warning");
     }
 
     private async Task SetStatus(int id, AppointmentStatus status)
@@ -216,9 +219,9 @@
             return;
         }
 
-        await ScheduleRepository.RescheduleAppointmentAsync(id, item.StartsAt.AddDays(1));
+        var result = await ScheduleRepository.RescheduleAppointmentAsync(id, item.StartsAt.AddDays(1));
         await LoadData();
-        SetMessage("Appointment rescheduled to the same time tomorrow.", "alert-success");
+        SetMessage(FormatResultMessage(result), result.Success ? "alert-success" : "alert-warning");
     }
 
     private void ApplyEditorScheduleToForm()
@@ -267,6 +270,11 @@
         message = text;
         messageClass = cssClass;
     }
+
+    private static string FormatResultMessage(ScheduleOperationResult result) =>
+        result.SuggestedStart is null
+            ? result.Message
+            : $"{result.Message} Next available suggestion: {result.SuggestedStart:MMM d, h:mm tt}.";
 
     private static string StatusClass(AppointmentStatus status) => $"pill-{status.ToString().ToLowerInvariant()}";
 }

@@ -1,5 +1,6 @@
 @page "/calendar"
 @inject IScheduleRepository ScheduleRepository
+@inject IAvailabilityService AvailabilityService
 
 <section class="page-title">
     <div>
@@ -17,7 +18,7 @@
     <div class="calendar-toolbar">
         <div>
             <h2 class="h4 mb-0">@weekStart.ToString("MMMM yyyy")</h2>
-            <div class="muted">Appointments are loaded from Entity Framework Core and color-coded by status.</div>
+            <div class="muted">Appointments and availability are loaded from Entity Framework Core.</div>
         </div>
         <a class="btn btn-primary btn-sm" href="appointments">Book Slot</a>
     </div>
@@ -44,6 +45,15 @@
                             <small>@item.Employee</small>
                         </div>
                     }
+
+                    @foreach (var block in availabilityBlocks.Where(e => e.StartsAt.Date == day.Date))
+                    {
+                        <div class="availability-overlay @AvailabilityCss(block.Status)">
+                            <strong>@block.Status</strong>
+                            <div>@block.StartsAt.ToString("h:mm tt") - @block.EndsAt.ToString("h:mm tt")</div>
+                            <small>@block.Employee</small>
+                        </div>
+                    }
                 </div>
             }
         </div>
@@ -53,9 +63,19 @@
 @code {
     private readonly DateTime weekStart = DateTime.Today;
     private List<CalendarEvent> events = [];
+    private List<AvailabilityListItem> availabilityBlocks = [];
 
     protected override async Task OnInitializedAsync()
     {
         events = (await ScheduleRepository.GetCalendarEventsAsync(weekStart, weekStart.AddDays(7))).ToList();
+        availabilityBlocks = (await AvailabilityService.GetAvailabilityAsync(weekStart, weekStart.AddDays(7))).ToList();
     }
+
+    private static string AvailabilityCss(AvailabilityStatus status) =>
+        status switch
+        {
+            AvailabilityStatus.Available => "available",
+            AvailabilityStatus.Busy => "busy",
+            _ => "timeoff"
+        };
 }

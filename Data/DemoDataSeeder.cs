@@ -49,6 +49,7 @@ public static class DemoDataSeeder
 
         if (await dbContext.Appointments.AnyAsync())
         {
+            await SeedAvailabilityAsync(dbContext);
             return;
         }
 
@@ -63,6 +64,37 @@ public static class DemoDataSeeder
             Create("Renewal planning", "Contoso Health", "ops@contoso.example", today.AddHours(13), AppointmentStatus.Pending, employees[Math.Min(2, employees.Count - 1)], appointmentTypes[0], locations[1]),
             Create("Executive briefing", "Fabrikam", "leaders@fabrikam.example", today.AddDays(1).AddHours(11), AppointmentStatus.Completed, employees[0], appointmentTypes[Math.Min(2, appointmentTypes.Count - 1)], locations[1]),
             Create("Reschedule request", "Alpine Ski House", "desk@alpine.example", today.AddDays(2).AddHours(15), AppointmentStatus.Cancelled, employees[0], appointmentTypes[0], locations[0]));
+
+        await dbContext.SaveChangesAsync();
+        await SeedAvailabilityAsync(dbContext);
+    }
+
+    private static async Task SeedAvailabilityAsync(ApplicationDbContext dbContext)
+    {
+        if (await dbContext.Availability.AnyAsync())
+        {
+            return;
+        }
+
+        var employees = await dbContext.Employees.OrderBy(employee => employee.FullName).ToListAsync();
+        var today = DateTime.Today;
+        dbContext.Availability.AddRange(
+            new AvailabilityBlock
+            {
+                EmployeeId = employees[0].Id,
+                StartsAt = today.AddHours(12),
+                EndsAt = today.AddHours(13),
+                Status = AvailabilityStatus.Busy,
+                Note = "Internal planning"
+            },
+            new AvailabilityBlock
+            {
+                EmployeeId = employees[Math.Min(1, employees.Count - 1)].Id,
+                StartsAt = today.AddDays(1).AddHours(14),
+                EndsAt = today.AddDays(1).AddHours(17),
+                Status = AvailabilityStatus.TimeOff,
+                Note = "Personal appointment"
+            });
 
         await dbContext.SaveChangesAsync();
     }

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using smartscheduler.Data;
 using smartscheduler.Data.Entities;
+using smartscheduler.Hubs;
 
 namespace smartscheduler.Services;
 
@@ -11,14 +13,16 @@ public interface IScheduleRepository
     Task<IReadOnlyList<AppointmentListItem>> GetAppointmentsAsync();
     Task<AppointmentFormOptions> GetAppointmentFormOptionsAsync();
     Task<AppointmentEditor> GetAppointmentEditorAsync(int? id = null);
-    Task SaveAppointmentAsync(AppointmentEditor editor);
+    Task<ScheduleOperationResult> SaveAppointmentAsync(AppointmentEditor editor);
     Task UpdateAppointmentStatusAsync(int id, AppointmentStatus status);
-    Task RescheduleAppointmentAsync(int id, DateTime startsAt);
+    Task<ScheduleOperationResult> RescheduleAppointmentAsync(int id, DateTime startsAt);
     IReadOnlyList<TeamMemberSchedule> GetTeamSchedules();
     IReadOnlyList<ReportMetric> GetReportMetrics();
 }
 
-public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : IScheduleRepository
+public sealed class ScheduleDashboardService(
+    ApplicationDbContext dbContext,
+    IHubContext<ScheduleHub> scheduleHub) : IScheduleRepository
 {
     public async Task<DashboardSnapshot> GetDashboardAsync()
     {
@@ -157,8 +161,14 @@ public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : I
         };
     }
 
-    public async Task SaveAppointmentAsync(AppointmentEditor editor)
+    public async Task<ScheduleOperationResult> SaveAppointmentAsync(AppointmentEditor editor)
     {
+        var validation = await ValidateAppointmentAsync(editor);
+        if (!validation.Success)
+        {
+            return validation;
+        }
+
         var appointment = editor.Id == 0
             ? new Appointment()
             : await dbContext.Appointments.FindAsync(editor.Id) ?? new Appointment { Id = editor.Id };
@@ -184,6 +194,8 @@ public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : I
         }
 
         await dbContext.SaveChangesAsync();
+        await BroadcastScheduleChangedAsync("Appointment saved.");
+        return ScheduleOperationResult.Ok("Appointment saved.");
     }
 
     public async Task UpdateAppointmentStatusAsync(int id, AppointmentStatus status)
@@ -196,9 +208,10 @@ public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : I
 
         appointment.Status = status;
         await dbContext.SaveChangesAsync();
+        await BroadcastScheduleChangedAsync($"Appointment marked {status}.");
     }
 
-    public async Task RescheduleAppointmentAsync(int id, DateTime startsAt)
+    public async Task<ScheduleOperationResult> RescheduleAppointmentAsync(int id, DateTime startsAt)
     {
         var appointment = await dbContext.Appointments
             .Include(item => item.AppointmentType)
@@ -206,14 +219,36 @@ public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : I
 
         if (appointment is null)
         {
-            return;
+            return ScheduleOperationResult.Fail("Appointment was not found.");
         }
 
         var duration = appointment.AppointmentType?.DurationMinutes ?? (int)(appointment.EndsAt - appointment.StartsAt).TotalMinutes;
+        var editor = new AppointmentEditor
+        {
+            Id = appointment.Id,
+            Subject = appointment.Subject,
+            CustomerName = appointment.CustomerName,
+            CustomerEmail = appointment.CustomerEmail,
+            StartsAt = startsAt,
+            EndsAt = startsAt.AddMinutes(Math.Max(duration, 15)),
+            Status = AppointmentStatus.Scheduled,
+            IsRecurring = appointment.IsRecurring,
+            EmployeeId = appointment.EmployeeId,
+            AppointmentTypeId = appointment.AppointmentTypeId,
+            LocationId = appointment.LocationId
+        };
+        var validation = await ValidateAppointmentAsync(editor);
+        if (!validation.Success)
+        {
+            return validation;
+        }
+
         appointment.StartsAt = startsAt;
         appointment.EndsAt = startsAt.AddMinutes(Math.Max(duration, 15));
         appointment.Status = AppointmentStatus.Scheduled;
         await dbContext.SaveChangesAsync();
+        await BroadcastScheduleChangedAsync("Appointment rescheduled.");
+        return ScheduleOperationResult.Ok("Appointment rescheduled.");
     }
 
     public IReadOnlyList<TeamMemberSchedule> GetTeamSchedules() =>
@@ -242,6 +277,116 @@ public sealed class ScheduleDashboardService(ApplicationDbContext dbContext) : I
             AppointmentStatus.Completed => "#8B5CF6",
             _ => "#14B8A6"
         };
+
+    private async Task<ScheduleOperationResult> ValidateAppointmentAsync(AppointmentEditor editor)
+    {
+        if (editor.EndsAt <= editor.StartsAt)
+        {
+            return ScheduleOperationResult.Fail("Appointment end time must be after the start time.");
+        }
+
+        var employee = await dbContext.Employees
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == editor.EmployeeId);
+
+        if (employee is null || !employee.IsActive)
+        {
+            return ScheduleOperationResult.Fail("Choose an active employee before booking.");
+        }
+
+        var startsAtTime = TimeOnly.FromDateTime(editor.StartsAt);
+        var endsAtTime = TimeOnly.FromDateTime(editor.EndsAt);
+        if (startsAtTime < employee.WorkdayStart || endsAtTime > employee.WorkdayEnd)
+        {
+            return ScheduleOperationResult.Fail(
+                $"{employee.FullName} works {employee.WorkdayStart:h\\:mm} - {employee.WorkdayEnd:h\\:mm}.",
+                await SuggestNextAvailableTimeAsync(editor));
+        }
+
+        var hasOverlap = await dbContext.Appointments
+            .AsNoTracking()
+            .AnyAsync(appointment =>
+                appointment.Id != editor.Id &&
+                appointment.EmployeeId == editor.EmployeeId &&
+                appointment.Status != AppointmentStatus.Cancelled &&
+                appointment.StartsAt < editor.EndsAt &&
+                editor.StartsAt < appointment.EndsAt);
+
+        if (hasOverlap)
+        {
+            return ScheduleOperationResult.Fail(
+                "This employee already has an appointment during that time.",
+                await SuggestNextAvailableTimeAsync(editor));
+        }
+
+        var timeOffBlock = await dbContext.Availability
+            .AsNoTracking()
+            .Where(block =>
+                block.EmployeeId == editor.EmployeeId &&
+                block.Status == AvailabilityStatus.TimeOff &&
+                block.StartsAt < editor.EndsAt &&
+                editor.StartsAt < block.EndsAt)
+            .OrderBy(block => block.StartsAt)
+            .FirstOrDefaultAsync();
+
+        if (timeOffBlock is not null)
+        {
+            return ScheduleOperationResult.Fail(
+                $"This time overlaps time off: {timeOffBlock.Note}.",
+                await SuggestNextAvailableTimeAsync(editor));
+        }
+
+        return ScheduleOperationResult.Ok("Appointment is available.");
+    }
+
+    private async Task<DateTime?> SuggestNextAvailableTimeAsync(AppointmentEditor editor)
+    {
+        var employee = await dbContext.Employees.AsNoTracking().FirstOrDefaultAsync(item => item.Id == editor.EmployeeId);
+        if (employee is null)
+        {
+            return null;
+        }
+
+        var duration = editor.EndsAt - editor.StartsAt;
+        var candidate = editor.StartsAt.AddMinutes(30);
+        for (var i = 0; i < 80; i++)
+        {
+            var startTime = TimeOnly.FromDateTime(candidate);
+            var endTime = TimeOnly.FromDateTime(candidate.Add(duration));
+            if (startTime >= employee.WorkdayStart && endTime <= employee.WorkdayEnd)
+            {
+                var conflict = await dbContext.Appointments.AsNoTracking().AnyAsync(appointment =>
+                    appointment.Id != editor.Id &&
+                    appointment.EmployeeId == editor.EmployeeId &&
+                    appointment.Status != AppointmentStatus.Cancelled &&
+                    appointment.StartsAt < candidate.Add(duration) &&
+                    candidate < appointment.EndsAt);
+                var blocked = await dbContext.Availability.AsNoTracking().AnyAsync(block =>
+                    block.EmployeeId == editor.EmployeeId &&
+                    block.Status == AvailabilityStatus.TimeOff &&
+                    block.StartsAt < candidate.Add(duration) &&
+                    candidate < block.EndsAt);
+
+                if (!conflict && !blocked)
+                {
+                    return candidate;
+                }
+            }
+
+            candidate = candidate.AddMinutes(30);
+            if (TimeOnly.FromDateTime(candidate) > employee.WorkdayEnd)
+            {
+                candidate = candidate.Date.AddDays(1).Add(employee.WorkdayStart.ToTimeSpan());
+            }
+        }
+
+        return null;
+    }
+
+    private async Task BroadcastScheduleChangedAsync(string message)
+    {
+        await scheduleHub.Clients.All.SendAsync("ScheduleChanged", message);
+    }
 }
 
 public sealed record DashboardSnapshot(
@@ -294,6 +439,12 @@ public sealed record AppointmentFormOptions(
     IReadOnlyList<Employee> Employees,
     IReadOnlyList<AppointmentType> AppointmentTypes,
     IReadOnlyList<Location> Locations);
+
+public sealed record ScheduleOperationResult(bool Success, string Message, DateTime? SuggestedStart = null)
+{
+    public static ScheduleOperationResult Ok(string message) => new(true, message);
+    public static ScheduleOperationResult Fail(string message, DateTime? suggestedStart = null) => new(false, message, suggestedStart);
+}
 
 public sealed record TeamMemberSchedule(
     string Name,
