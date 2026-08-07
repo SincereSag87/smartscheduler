@@ -24,6 +24,11 @@ else
 {
     <section class="ss-grid kpi-grid">
         <div class="ss-card kpi">
+            <div class="kpi-label">Portfolio version</div>
+            <div class="kpi-value">1.0</div>
+            <span class="pill pill-completed">Core modules complete</span>
+        </div>
+        <div class="ss-card kpi">
             <div class="kpi-label">Today&apos;s appointments</div>
             <div class="kpi-value">@dashboard.TodayAppointments</div>
             <span class="pill pill-confirmed">Confirmed flow</span>
@@ -92,12 +97,38 @@ else
             </div>
         </aside>
     </section>
+
+    <section class="ss-card mt-4">
+        <div class="calendar-toolbar">
+            <div>
+                <h2 class="h4 mb-1">Completed Modules</h2>
+                <div class="muted">Portfolio-ready scope across scheduling, reporting, administration, and security.</div>
+            </div>
+            <a class="btn btn-outline-primary btn-sm" href="project-info">Project Info</a>
+        </div>
+        <div class="ss-grid kpi-grid">
+            @foreach (var module in completedModules)
+            {
+                <span class="pill pill-confirmed">@module</span>
+            }
+        </div>
+    </section>
 }
 
 @code {
     private DashboardSnapshot? dashboard;
     private HubConnection? hubConnection;
     private string refreshMessage = string.Empty;
+    private readonly List<string> completedModules =
+    [
+        "Identity/RBAC",
+        "Appointments",
+        "Availability",
+        "SignalR",
+        "Reports",
+        "Audit Logs",
+        "Admin Config"
+    ];
 
     protected override async Task OnInitializedAsync()
     {

@@ -1,0 +1,105 @@
+@page "/project-info"
+
+<section class="page-title">
+    <div>
+        <h1>Project Info</h1>
+        <p>SmartScheduler is a C# enterprise scheduling portfolio application built with Blazor, Identity, EF Core, SQL Server, and SignalR.</p>
+    </div>
+    <a class="btn btn-primary" href="Account/Login">Demo Login</a>
+</section>
+
+<section class="ss-grid kpi-grid">
+    <div class="ss-card">
+        <h2 class="h4">Blazor Server</h2>
+        <p class="muted">Interactive Razor components, role-aware navigation, forms, dashboards, and real-time scheduling workflows.</p>
+        <span class="pill pill-scheduled">.NET 9</span>
+    </div>
+    <div class="ss-card">
+        <h2 class="h4">Identity & RBAC</h2>
+        <p class="muted">Seeded Admin, Manager, and Scheduler users with page-level authorization and access-denied UX.</p>
+        <span class="pill pill-completed">Secure</span>
+    </div>
+    <div class="ss-card">
+        <h2 class="h4">EF Core & SQL Server</h2>
+        <p class="muted">Appointments, availability, employees, departments, reports, notifications, and audit logs are backed by SQL Server.</p>
+        <span class="pill pill-confirmed">Data driven</span>
+    </div>
+    <div class="ss-card">
+        <h2 class="h4">SignalR</h2>
+        <p class="muted">Dashboard, calendar, appointments, and availability pages refresh when scheduling changes are broadcast.</p>
+        <span class="pill pill-available">Real time</span>
+    </div>
+</section>
+
+<section class="ss-grid panel-grid mt-4">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">What This Demonstrates</h2>
+        <div class="team-list">
+            @foreach (var item in demonstratedSkills)
+            {
+                <div class="team-row">
+                    <strong>@item.Title</strong>
+                    <span class="muted">@item.Description</span>
+                </div>
+            }
+        </div>
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">Demo Credentials</h2>
+        <div class="notification-list">
+            <div class="notification-row d-block">
+                <strong>Admin</strong>
+                <div class="muted">@IdentitySeedData.AdminEmail</div>
+            </div>
+            <div class="notification-row d-block">
+                <strong>Manager</strong>
+                <div class="muted">@IdentitySeedData.ManagerEmail</div>
+            </div>
+            <div class="notification-row d-block">
+                <strong>Scheduler</strong>
+                <div class="muted">@IdentitySeedData.SchedulerEmail</div>
+            </div>
+        </div>
+        <p class="muted mt-3 mb-0">Password: <strong>SmartScheduler!2026</strong></p>
+    </aside>
+</section>
+
+<section class="ss-card mt-4">
+    <h2 class="h4 mb-3">Completed Modules</h2>
+    <div class="ss-grid kpi-grid">
+        @foreach (var module in completedModules)
+        {
+            <div>
+                <span class="pill pill-confirmed">@module</span>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    private readonly List<ProjectSkill> demonstratedSkills =
+    [
+        new("Scheduling Logic", "Conflict detection, working-hour validation, time-off validation, and next-slot suggestions."),
+        new("Enterprise Data Model", "Employees, departments, appointments, appointment types, locations, availability, reports, notifications, and audit logs."),
+        new("Reporting", "Filtered EF Core reports with employee utilization, monthly trends, status breakdowns, department summaries, and CSV export."),
+        new("Administration", "Role-protected configuration for appointment types, locations, business hours, and closures."),
+        new("Real-Time UX", "SignalR updates refresh active scheduling pages after operational changes.")
+    ];
+
+    private readonly List<string> completedModules =
+    [
+        "Dashboard",
+        "Calendar",
+        "Appointments",
+        "Availability",
+        "Team Scheduling",
+        "Reports",
+        "Admin Configuration",
+        "Identity/RBAC",
+        "Notifications",
+        "Audit Logs"
+    ];
+
+    private sealed record ProjectSkill(string Title, string Description);
+}
