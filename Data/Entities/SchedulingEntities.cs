@@ -18,6 +18,12 @@ public enum AvailabilityStatus
     TimeOff
 }
 
+public enum ClosureScope
+{
+    Organization,
+    Location
+}
+
 public sealed class Department
 {
     public int Id { get; set; }
@@ -61,6 +67,8 @@ public sealed class Location
 
     [MaxLength(80)]
     public string TimeZone { get; set; } = "America/New_York";
+
+    public bool IsActive { get; set; } = true;
 }
 
 public sealed class AppointmentType
@@ -74,6 +82,36 @@ public sealed class AppointmentType
 
     [MaxLength(16)]
     public string Color { get; set; } = "#14B8A6";
+
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class BusinessHour
+{
+    public int Id { get; set; }
+
+    public int? LocationId { get; set; }
+    public Location? Location { get; set; }
+
+    public DayOfWeek DayOfWeek { get; set; }
+    public TimeOnly OpensAt { get; set; } = new(8, 30);
+    public TimeOnly ClosesAt { get; set; } = new(17, 0);
+    public bool IsClosed { get; set; }
+}
+
+public sealed class ClosureBlock
+{
+    public int Id { get; set; }
+
+    public int? LocationId { get; set; }
+    public Location? Location { get; set; }
+
+    public ClosureScope Scope { get; set; } = ClosureScope.Organization;
+    public DateTime StartsAt { get; set; }
+    public DateTime EndsAt { get; set; }
+
+    [MaxLength(180)]
+    public string Reason { get; set; } = string.Empty;
 }
 
 public sealed class Appointment

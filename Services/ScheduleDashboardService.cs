@@ -118,8 +118,8 @@ public sealed class ScheduleDashboardService(
     public async Task<AppointmentFormOptions> GetAppointmentFormOptionsAsync() =>
         new(
             await dbContext.Employees.AsNoTracking().Where(employee => employee.IsActive).OrderBy(employee => employee.FullName).ToListAsync(),
-            await dbContext.AppointmentTypes.AsNoTracking().OrderBy(type => type.Name).ToListAsync(),
-            await dbContext.Locations.AsNoTracking().OrderBy(location => location.Name).ToListAsync());
+            await dbContext.AppointmentTypes.AsNoTracking().Where(type => type.IsActive).OrderBy(type => type.Name).ToListAsync(),
+            await dbContext.Locations.AsNoTracking().Where(location => location.IsActive).OrderBy(location => location.Name).ToListAsync());
 
     public async Task<AppointmentEditor> GetAppointmentEditorAsync(int? id = null)
     {

@@ -38,6 +38,7 @@ builder.Services.AddScoped<IScheduleRepository, ScheduleDashboardService>();
 builder.Services.AddScoped<ITeamManagementService, TeamManagementService>();
 builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 builder.Services.AddScoped<IReportingService, ReportingService>();
+builder.Services.AddScoped<IAdminConfigurationService, AdminConfigurationService>();
 builder.Services.AddSignalR();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)

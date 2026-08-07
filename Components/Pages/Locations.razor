@@ -1,0 +1,121 @@
+@page "/locations"
+@rendermode InteractiveServer
+@inject IAdminConfigurationService AdminService
+
+<section class="page-title">
+    <div>
+        <h1>Locations</h1>
+        <p>Manage offices, virtual locations, time zones, and active booking availability.</p>
+    </div>
+    <button class="btn btn-primary" @onclick="StartNew">New Location</button>
+</section>
+
+<section class="ss-grid panel-grid">
+    <div class="ss-card">
+        <h2 class="h4 mb-3">Location Directory</h2>
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Time zone</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var location in locations)
+                    {
+                        <tr>
+                            <td><strong>@location.Name</strong></td>
+                            <td>@location.TimeZone</td>
+                            <td><span class="pill @(location.IsActive ? "pill-confirmed" : "pill-cancelled")">@(location.IsActive ? "Active" : "Inactive")</span></td>
+                            <td class="text-end">
+                                <button class="btn btn-outline-primary btn-sm me-2" @onclick="() => EditLocation(location.Id)">Edit</button>
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => ToggleLocation(location.Id)">Toggle</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <aside class="ss-card">
+        <h2 class="h4 mb-3">@FormTitle</h2>
+        <div class="mb-3">
+            <label class="form-label" for="name">Name</label>
+            <input id="name" class="form-control" @bind="editor.Name" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="timezone">Time zone</label>
+            <input id="timezone" class="form-control" @bind="editor.TimeZone" />
+        </div>
+        <div class="form-check form-switch">
+            <input id="active" class="form-check-input" type="checkbox" @bind="editor.IsActive" />
+            <label class="form-check-label" for="active">Active for booking</label>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-primary" @onclick="SaveLocation">Save</button>
+            <button class="btn btn-outline-secondary" @onclick="StartNew">Reset</button>
+        </div>
+        @if (!string.IsNullOrWhiteSpace(message))
+        {
+            <div class="alert @messageClass mt-3 mb-0">@message</div>
+        }
+    </aside>
+</section>
+
+@code {
+    private List<Location> locations = [];
+    private Location editor = new();
+    private string message = string.Empty;
+    private string messageClass = "alert-info";
+    private string FormTitle => editor.Id == 0 ? "Add Location" : "Edit Location";
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        locations = (await AdminService.GetLocationsAsync()).ToList();
+    }
+
+    private async Task StartNew()
+    {
+        editor = await AdminService.GetLocationEditorAsync();
+        message = string.Empty;
+    }
+
+    private async Task EditLocation(int id)
+    {
+        editor = await AdminService.GetLocationEditorAsync(id);
+        message = string.Empty;
+    }
+
+    private async Task SaveLocation()
+    {
+        if (string.IsNullOrWhiteSpace(editor.Name) || string.IsNullOrWhiteSpace(editor.TimeZone))
+        {
+            SetMessage("Name and time zone are required.", "alert-warning");
+            return;
+        }
+
+        await AdminService.SaveLocationAsync(editor);
+        await LoadData();
+        await StartNew();
+        SetMessage("Location saved.", "alert-success");
+    }
+
+    private async Task ToggleLocation(int id)
+    {
+        await AdminService.ToggleLocationAsync(id);
+        await LoadData();
+        SetMessage("Location status updated.", "alert-success");
+    }
+
+    private void SetMessage(string text, string cssClass)
+    {
+        message = text;
+        messageClass = cssClass;
+    }
+}

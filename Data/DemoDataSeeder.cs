@@ -67,6 +67,7 @@ public static class DemoDataSeeder
 
         await dbContext.SaveChangesAsync();
         await SeedAvailabilityAsync(dbContext);
+        await SeedBusinessHoursAsync(dbContext);
     }
 
     private static async Task SeedAvailabilityAsync(ApplicationDbContext dbContext)
@@ -95,6 +96,36 @@ public static class DemoDataSeeder
                 Status = AvailabilityStatus.TimeOff,
                 Note = "Personal appointment"
             });
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task SeedBusinessHoursAsync(ApplicationDbContext dbContext)
+    {
+        if (!await dbContext.BusinessHours.AnyAsync())
+        {
+            foreach (var day in Enum.GetValues<DayOfWeek>())
+            {
+                dbContext.BusinessHours.Add(new BusinessHour
+                {
+                    DayOfWeek = day,
+                    OpensAt = new TimeOnly(8, 30),
+                    ClosesAt = new TimeOnly(17, 0),
+                    IsClosed = day is DayOfWeek.Saturday or DayOfWeek.Sunday
+                });
+            }
+        }
+
+        if (!await dbContext.ClosureBlocks.AnyAsync())
+        {
+            dbContext.ClosureBlocks.Add(new ClosureBlock
+            {
+                Scope = ClosureScope.Organization,
+                StartsAt = DateTime.Today.AddDays(14).AddHours(8),
+                EndsAt = DateTime.Today.AddDays(14).AddHours(17),
+                Reason = "Company planning day"
+            });
+        }
 
         await dbContext.SaveChangesAsync();
     }

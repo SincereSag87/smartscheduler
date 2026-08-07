@@ -1,5 +1,6 @@
 @page "/admin"
 @inject IScheduleRepository ScheduleRepository
+@inject IAdminConfigurationService AdminService
 
 <section class="page-title">
     <div>
@@ -16,18 +17,23 @@
         <span class="pill pill-scheduled">Identity enabled</span>
     </div>
     <div class="ss-card">
-        <h2 class="h4">Departments</h2>
-        <p class="muted">Department and employee records are managed through Entity Framework Core.</p>
-        <span class="pill pill-confirmed">EF backed</span>
+        <h2 class="h4">Appointment Types</h2>
+        <p class="muted">@summary.ActiveAppointmentTypes of @summary.AppointmentTypes types are active for booking.</p>
+        <a class="btn btn-outline-primary btn-sm" href="appointment-types">Manage Types</a>
+    </div>
+    <div class="ss-card">
+        <h2 class="h4">Locations</h2>
+        <p class="muted">@summary.ActiveLocations of @summary.Locations locations are available for scheduling.</p>
+        <a class="btn btn-outline-primary btn-sm" href="locations">Manage Locations</a>
     </div>
     <div class="ss-card">
         <h2 class="h4">Business Hours</h2>
-        <p class="muted">Working windows and time-off blocks prevent invalid scheduling.</p>
-        <span class="pill pill-pending">Validated</span>
+        <p class="muted">@summary.BusinessHourRules weekly rules and @summary.ClosureBlocks closure blocks configured.</p>
+        <a class="btn btn-outline-primary btn-sm" href="business-hours">Manage Hours</a>
     </div>
     <div class="ss-card">
         <h2 class="h4">Audit Logs</h2>
-        <p class="muted">Appointment and availability lifecycle changes are recorded for administrative review.</p>
+        <p class="muted">Last update: @(summary.LastUpdated?.ToLocalTime().ToString("MMM d, h:mm tt") ?? "No records")</p>
         <span class="pill pill-completed">@auditLogs.Count records</span>
     </div>
 </section>
@@ -73,9 +79,11 @@
 
 @code {
     private List<AuditLogItem> auditLogs = [];
+    private AdminConfigurationSummary summary = new(0, 0, 0, 0, 0, 0, null);
 
     protected override async Task OnInitializedAsync()
     {
+        summary = await AdminService.GetSummaryAsync();
         auditLogs = (await ScheduleRepository.GetAuditLogsAsync()).ToList();
     }
 }
