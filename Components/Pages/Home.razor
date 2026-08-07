@@ -1,10 +1,17 @@
 @page "/"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IScheduleRepository ScheduleRepository
+@inject NavigationManager NavigationManager
 
 <section class="page-title">
     <div>
         <h1>Dashboard</h1>
         <p>Today&apos;s schedule, utilization, team availability, and live appointment alerts.</p>
+        @if (!string.IsNullOrWhiteSpace(refreshMessage))
+        {
+            <div class="live-refresh">@refreshMessage</div>
+        }
     </div>
     <a class="btn btn-primary" href="appointments">New Appointment</a>
 </section>
@@ -74,7 +81,10 @@ else
                 @foreach (var notification in dashboard.Notifications)
                 {
                     <div class="notification-row d-block">
-                        <strong>@notification.Title</strong>
+                        <div class="d-flex justify-content-between gap-2">
+                            <strong>@notification.Title</strong>
+                            <button class="btn btn-link btn-sm p-0" @onclick="() => MarkNotificationRead(notification.Id)">Mark read</button>
+                        </div>
                         <p class="muted mb-1">@notification.Message</p>
                         <small class="muted">@notification.Age</small>
                     </div>
@@ -86,10 +96,42 @@ else
 
 @code {
     private DashboardSnapshot? dashboard;
+    private HubConnection? hubConnection;
+    private string refreshMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadDashboard();
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/schedule-hub"))
+            .WithAutomaticReconnect()
+            .Build();
+        hubConnection.On<string>("ScheduleChanged", async message =>
+        {
+            refreshMessage = $"Updated just now: {message}";
+            await LoadDashboard();
+            await InvokeAsync(StateHasChanged);
+        });
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadDashboard()
+    {
         dashboard = await ScheduleRepository.GetDashboardAsync();
+    }
+
+    private async Task MarkNotificationRead(int id)
+    {
+        await ScheduleRepository.MarkNotificationReadAsync(id);
+        await LoadDashboard();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
     private static string StatusClass(AppointmentStatus status) => $"pill-{status.ToString().ToLowerInvariant()}";

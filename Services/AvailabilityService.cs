@@ -106,7 +106,8 @@ public sealed class AvailabilityService(
         block.Status = editor.Status;
         block.Note = editor.Note.Trim();
 
-        if (block.Id == 0)
+        var isNew = block.Id == 0;
+        if (isNew)
         {
             dbContext.Availability.Add(block);
         }
@@ -116,6 +117,10 @@ public sealed class AvailabilityService(
         }
 
         await dbContext.SaveChangesAsync();
+        await RecordOperationalEventAsync(
+            "Availability updated",
+            $"{block.Status} block was {(isNew ? "created" : "updated")} for {block.StartsAt:MMM d, h:mm tt}.",
+            isNew ? "Create" : "Edit");
         await scheduleHub.Clients.All.SendAsync("ScheduleChanged", "Availability updated.");
         return AvailabilityOperationResult.Ok("Availability saved.");
     }
@@ -130,7 +135,29 @@ public sealed class AvailabilityService(
 
         dbContext.Availability.Remove(block);
         await dbContext.SaveChangesAsync();
+        await RecordOperationalEventAsync(
+            "Availability removed",
+            $"{block.Status} block was deleted.",
+            "Delete");
         await scheduleHub.Clients.All.SendAsync("ScheduleChanged", "Availability removed.");
+    }
+
+    private async Task RecordOperationalEventAsync(string title, string message, string action)
+    {
+        dbContext.Notifications.Add(new Notification
+        {
+            Title = title,
+            Message = message,
+            CreatedAt = DateTime.UtcNow
+        });
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            EntityName = "Availability",
+            Action = action,
+            Actor = "System",
+            CreatedAt = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
     }
 }
 

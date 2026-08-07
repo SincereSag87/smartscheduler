@@ -1,11 +1,18 @@
 @page "/calendar"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IScheduleRepository ScheduleRepository
 @inject IAvailabilityService AvailabilityService
+@inject NavigationManager NavigationManager
 
 <section class="page-title">
     <div>
         <h1>Calendar</h1>
         <p>Day, week, and month planning with status-colored appointments from SQL Server.</p>
+        @if (!string.IsNullOrWhiteSpace(refreshMessage))
+        {
+            <div class="live-refresh">@refreshMessage</div>
+        }
     </div>
     <div class="btn-group">
         <button class="btn btn-outline-primary active">Week</button>
@@ -64,11 +71,37 @@
     private readonly DateTime weekStart = DateTime.Today;
     private List<CalendarEvent> events = [];
     private List<AvailabilityListItem> availabilityBlocks = [];
+    private HubConnection? hubConnection;
+    private string refreshMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadCalendar();
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/schedule-hub"))
+            .WithAutomaticReconnect()
+            .Build();
+        hubConnection.On<string>("ScheduleChanged", async message =>
+        {
+            refreshMessage = $"Updated just now: {message}";
+            await LoadCalendar();
+            await InvokeAsync(StateHasChanged);
+        });
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadCalendar()
+    {
         events = (await ScheduleRepository.GetCalendarEventsAsync(weekStart, weekStart.AddDays(7))).ToList();
         availabilityBlocks = (await AvailabilityService.GetAvailabilityAsync(weekStart, weekStart.AddDays(7))).ToList();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
     private static string AvailabilityCss(AvailabilityStatus status) =>

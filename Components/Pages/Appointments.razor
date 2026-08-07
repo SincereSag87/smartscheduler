@@ -1,11 +1,17 @@
 @page "/appointments"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IScheduleRepository ScheduleRepository
+@inject NavigationManager NavigationManager
 
 <section class="page-title">
     <div>
         <h1>Appointments</h1>
         <p>Create, edit, cancel, complete, reschedule, and manage recurring appointments.</p>
+        @if (!string.IsNullOrWhiteSpace(refreshMessage))
+        {
+            <div class="live-refresh">@refreshMessage</div>
+        }
     </div>
     <button class="btn btn-primary" @onclick="StartNew">Create Appointment</button>
 </section>
@@ -155,6 +161,8 @@
     private int durationMinutes = 30;
     private string message = string.Empty;
     private string messageClass = "alert-info";
+    private HubConnection? hubConnection;
+    private string refreshMessage = string.Empty;
 
     private string FormTitle => editor.Id == 0 ? "Booking Form" : "Edit Appointment";
     private bool CanCreateAppointments => options.Employees.Count > 0 && options.AppointmentTypes.Count > 0 && options.Locations.Count > 0;
@@ -163,6 +171,17 @@
     {
         await LoadData();
         await StartNew();
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/schedule-hub"))
+            .WithAutomaticReconnect()
+            .Build();
+        hubConnection.On<string>("ScheduleChanged", async updateMessage =>
+        {
+            refreshMessage = $"Updated just now: {updateMessage}";
+            await LoadData();
+            await InvokeAsync(StateHasChanged);
+        });
+        await hubConnection.StartAsync();
     }
 
     private async Task LoadData()
@@ -269,6 +288,14 @@
     {
         message = text;
         messageClass = cssClass;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
     private static string FormatResultMessage(ScheduleOperationResult result) =>

@@ -9,6 +9,8 @@ namespace smartscheduler.Services;
 public interface IScheduleRepository
 {
     Task<DashboardSnapshot> GetDashboardAsync();
+    Task MarkNotificationReadAsync(int id);
+    Task<IReadOnlyList<AuditLogItem>> GetAuditLogsAsync();
     Task<IReadOnlyList<CalendarEvent>> GetCalendarEventsAsync(DateTime? startsOnOrAfter = null, DateTime? endsBefore = null);
     Task<IReadOnlyList<AppointmentListItem>> GetAppointmentsAsync();
     Task<AppointmentFormOptions> GetAppointmentFormOptionsAsync();
@@ -51,13 +53,28 @@ public sealed class ScheduleDashboardService(
             PendingRequests: events.Count(e => e.Status == AppointmentStatus.Pending),
             TeamAvailable: activeEmployees,
             UpcomingMeetings: events.OrderBy(e => e.StartsAt).Take(5).ToList(),
-            Notifications:
-            [
-                new("Appointment queue synced", $"{events.Count} appointments loaded from SQL Server.", "now"),
-                new("Pending requests", $"{events.Count(e => e.Status == AppointmentStatus.Pending)} appointments need confirmation.", "today"),
-                new("Team coverage", $"{activeEmployees} employees are active for scheduling.", "today")
-            ]);
+            Notifications: await GetUnreadNotificationsAsync());
     }
+
+    public async Task MarkNotificationReadAsync(int id)
+    {
+        var notification = await dbContext.Notifications.FindAsync(id);
+        if (notification is null)
+        {
+            return;
+        }
+
+        notification.IsRead = true;
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task<IReadOnlyList<AuditLogItem>> GetAuditLogsAsync() =>
+        await dbContext.AuditLogs
+            .AsNoTracking()
+            .OrderByDescending(log => log.CreatedAt)
+            .Take(50)
+            .Select(log => new AuditLogItem(log.Id, log.EntityName, log.Action, log.Actor, log.CreatedAt))
+            .ToListAsync();
 
     public async Task<IReadOnlyList<CalendarEvent>> GetCalendarEventsAsync(DateTime? startsOnOrAfter = null, DateTime? endsBefore = null)
     {
@@ -184,7 +201,8 @@ public sealed class ScheduleDashboardService(
         appointment.AppointmentTypeId = editor.AppointmentTypeId;
         appointment.LocationId = editor.LocationId;
 
-        if (appointment.Id == 0)
+        var isNew = appointment.Id == 0;
+        if (isNew)
         {
             dbContext.Appointments.Add(appointment);
         }
@@ -194,6 +212,11 @@ public sealed class ScheduleDashboardService(
         }
 
         await dbContext.SaveChangesAsync();
+        await RecordOperationalEventAsync(
+            "Appointment saved",
+            $"{appointment.Subject} for {appointment.CustomerName} was {(isNew ? "created" : "updated")}.",
+            "Appointment",
+            isNew ? "Create" : "Edit");
         await BroadcastScheduleChangedAsync("Appointment saved.");
         return ScheduleOperationResult.Ok("Appointment saved.");
     }
@@ -208,6 +231,11 @@ public sealed class ScheduleDashboardService(
 
         appointment.Status = status;
         await dbContext.SaveChangesAsync();
+        await RecordOperationalEventAsync(
+            $"Appointment {status}",
+            $"{appointment.Subject} was marked {status}.",
+            "Appointment",
+            status.ToString());
         await BroadcastScheduleChangedAsync($"Appointment marked {status}.");
     }
 
@@ -247,6 +275,11 @@ public sealed class ScheduleDashboardService(
         appointment.EndsAt = startsAt.AddMinutes(Math.Max(duration, 15));
         appointment.Status = AppointmentStatus.Scheduled;
         await dbContext.SaveChangesAsync();
+        await RecordOperationalEventAsync(
+            "Appointment rescheduled",
+            $"{appointment.Subject} was moved to {appointment.StartsAt:MMM d, h:mm tt}.",
+            "Appointment",
+            "Reschedule");
         await BroadcastScheduleChangedAsync("Appointment rescheduled.");
         return ScheduleOperationResult.Ok("Appointment rescheduled.");
     }
@@ -387,6 +420,37 @@ public sealed class ScheduleDashboardService(
     {
         await scheduleHub.Clients.All.SendAsync("ScheduleChanged", message);
     }
+
+    private async Task<IReadOnlyList<SchedulerNotification>> GetUnreadNotificationsAsync() =>
+        await dbContext.Notifications
+            .AsNoTracking()
+            .Where(notification => !notification.IsRead)
+            .OrderByDescending(notification => notification.CreatedAt)
+            .Take(6)
+            .Select(notification => new SchedulerNotification(
+                notification.Id,
+                notification.Title,
+                notification.Message,
+                notification.CreatedAt))
+            .ToListAsync();
+
+    private async Task RecordOperationalEventAsync(string title, string message, string entityName, string action)
+    {
+        dbContext.Notifications.Add(new Notification
+        {
+            Title = title,
+            Message = message,
+            CreatedAt = DateTime.UtcNow
+        });
+        dbContext.AuditLogs.Add(new AuditLog
+        {
+            EntityName = entityName,
+            Action = action,
+            Actor = "System",
+            CreatedAt = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+    }
 }
 
 public sealed record DashboardSnapshot(
@@ -453,6 +517,11 @@ public sealed record TeamMemberSchedule(
     AvailabilityStatus Availability,
     int AppointmentsToday);
 
-public sealed record SchedulerNotification(string Title, string Message, string Age);
+public sealed record SchedulerNotification(int Id, string Title, string Message, DateTime CreatedAt)
+{
+    public string Age => CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt");
+}
+
+public sealed record AuditLogItem(int Id, string EntityName, string Action, string Actor, DateTime CreatedAt);
 
 public sealed record ReportMetric(string Label, int Value, string Trend);

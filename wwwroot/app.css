@@ -261,6 +261,13 @@ h4 {
     min-width: 280px;
 }
 
+.live-refresh {
+    margin-top: 0.4rem;
+    color: var(--ss-primary);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
 .form-card {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

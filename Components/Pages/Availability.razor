@@ -1,12 +1,18 @@
 @page "/availability"
 @rendermode InteractiveServer
+@implements IAsyncDisposable
 @inject IAvailabilityService AvailabilityService
 @inject ITeamManagementService TeamService
+@inject NavigationManager NavigationManager
 
 <section class="page-title">
     <div>
         <h1>Availability</h1>
         <p>Manage availability, busy blocks, and time off by employee.</p>
+        @if (!string.IsNullOrWhiteSpace(refreshMessage))
+        {
+            <div class="live-refresh">@refreshMessage</div>
+        }
     </div>
     <button class="btn btn-primary" @onclick="StartNew">New Block</button>
 </section>
@@ -116,6 +122,8 @@
     private string endTime = "13:00";
     private string message = string.Empty;
     private string messageClass = "alert-info";
+    private HubConnection? hubConnection;
+    private string refreshMessage = string.Empty;
 
     private string FormTitle => editor.Id == 0 ? "Add Availability" : "Edit Availability";
 
@@ -123,6 +131,17 @@
     {
         await LoadData();
         await StartNew();
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/schedule-hub"))
+            .WithAutomaticReconnect()
+            .Build();
+        hubConnection.On<string>("ScheduleChanged", async updateMessage =>
+        {
+            refreshMessage = $"Updated just now: {updateMessage}";
+            await LoadData();
+            await InvokeAsync(StateHasChanged);
+        });
+        await hubConnection.StartAsync();
     }
 
     private async Task LoadData()
@@ -189,6 +208,14 @@
     {
         message = text;
         messageClass = cssClass;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
     }
 
     private static string AvailabilityClass(AvailabilityStatus status) =>
