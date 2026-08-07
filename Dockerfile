@@ -11,6 +11,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
 ENV ASPNETCORE_URLS=http://+:8080
+ENV DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE=false
 EXPOSE 8080
 
 COPY --from=build /app/publish ./

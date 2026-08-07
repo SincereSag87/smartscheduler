@@ -231,6 +231,7 @@ Render environment variables:
 | `Database__Provider` | `Sqlite` |
 | `Database__ApplyMigrationsOnStartup` | `true` |
 | `ConnectionStrings__DefaultConnection` | `Data Source=/tmp/smartscheduler.db` |
+| `DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE` | `false` |
 
 The included `render.yaml` defines the same settings for Render&apos;s free tier.
 
@@ -257,6 +258,7 @@ Notes:
 - SQLite mode uses `EnsureCreated` instead of SQL Server migrations.
 - This avoids Azure SQL for demo hosting.
 - Free-tier SQLite data is ephemeral and can reset when Render restarts the service.
+- Config reload file watchers are disabled to avoid Render free-tier inotify limits.
 - For persistent demo data, upgrade the Render service and mount a disk at `/data`, then use `Data Source=/data/smartscheduler.db`.
 - Do not use this SQLite demo configuration for a real production scheduling system.
 

@@ -13,3 +13,5 @@ services:
         value: true
       - key: ConnectionStrings__DefaultConnection
         value: Data Source=/tmp/smartscheduler.db
+      - key: DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE
+        value: false
