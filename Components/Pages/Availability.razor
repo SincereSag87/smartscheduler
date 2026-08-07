@@ -1,4 +1,5 @@
 @page "/availability"
+@attribute [Authorize(Roles = AppRoles.SchedulerOrManagerOrAdmin)]
 @rendermode InteractiveServer
 @implements IAsyncDisposable
 @inject IAvailabilityService AvailabilityService

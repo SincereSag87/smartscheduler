@@ -1,8 +1,30 @@
-﻿@page "/Account/AccessDenied"
+@page "/Account/AccessDenied"
 
 <PageTitle>Access denied</PageTitle>
 
-<header>
-    <h1 class="text-danger">Access denied</h1>
-    <p class="text-danger">You do not have access to this resource.</p>
-</header>
+<section class="page-title">
+    <div>
+        <h1>Access Denied</h1>
+        <p>Your account does not have the role required to open this SmartScheduler workspace area.</p>
+    </div>
+    <a class="btn btn-primary" href="">Back to Dashboard</a>
+</section>
+
+<section class="ss-card">
+    <h2 class="h4 mb-3">Role Required</h2>
+    <p class="muted mb-3">SmartScheduler uses role-based access control for enterprise scheduling operations, reports, and administration.</p>
+    <div class="ss-grid kpi-grid">
+        <div>
+            <span class="pill pill-completed">Admin</span>
+            <p class="muted mt-2 mb-0">Configuration, audit logs, users, reports, and scheduling operations.</p>
+        </div>
+        <div>
+            <span class="pill pill-scheduled">Manager</span>
+            <p class="muted mt-2 mb-0">Reports, team scheduling, employees, departments, and appointment workflows.</p>
+        </div>
+        <div>
+            <span class="pill pill-confirmed">Scheduler</span>
+            <p class="muted mt-2 mb-0">Calendar, appointments, and availability operations.</p>
+        </div>
+    </div>
+</section>

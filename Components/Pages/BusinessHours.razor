@@ -1,4 +1,5 @@
 @page "/business-hours"
+@attribute [Authorize(Roles = AppRoles.AdminOnly)]
 @rendermode InteractiveServer
 @inject IAdminConfigurationService AdminService
 

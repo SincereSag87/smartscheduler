@@ -42,6 +42,7 @@ builder.Services.AddScoped<IAdminConfigurationService, AdminConfigurationService
 builder.Services.AddSignalR();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
+    .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
@@ -54,6 +55,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
+    await IdentitySeedData.SeedAsync(app.Services);
     await DemoDataSeeder.SeedAsync(app.Services);
 }
 else
