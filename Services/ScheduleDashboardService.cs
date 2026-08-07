@@ -19,38 +19,24 @@ public interface IScheduleRepository
     Task UpdateAppointmentStatusAsync(int id, AppointmentStatus status);
     Task<ScheduleOperationResult> RescheduleAppointmentAsync(int id, DateTime startsAt);
     IReadOnlyList<TeamMemberSchedule> GetTeamSchedules();
-    IReadOnlyList<ReportMetric> GetReportMetrics();
 }
 
 public sealed class ScheduleDashboardService(
     ApplicationDbContext dbContext,
-    IHubContext<ScheduleHub> scheduleHub) : IScheduleRepository
+    IHubContext<ScheduleHub> scheduleHub,
+    IReportingService reportingService) : IScheduleRepository
 {
     public async Task<DashboardSnapshot> GetDashboardAsync()
     {
         var today = DateTime.Today;
-        var weekStart = today.AddDays(-(int)today.DayOfWeek);
-        var weekEnd = weekStart.AddDays(7);
+        var report = await reportingService.GetReportAsync(new ReportFilter(today.AddDays(-(int)today.DayOfWeek), today.AddDays(7), null, null, null));
         var events = await GetCalendarEventsAsync(today, today.AddDays(14));
-        var weeklyAppointments = await dbContext.Appointments
-            .AsNoTracking()
-            .CountAsync(appointment => appointment.StartsAt >= weekStart && appointment.StartsAt < weekEnd);
         var activeEmployees = await dbContext.Employees.CountAsync(employee => employee.IsActive);
-        var completedThisWeek = await dbContext.Appointments
-            .AsNoTracking()
-            .CountAsync(appointment =>
-                appointment.StartsAt >= weekStart &&
-                appointment.StartsAt < weekEnd &&
-                appointment.Status == AppointmentStatus.Completed);
-
-        var weeklyUtilization = weeklyAppointments == 0
-            ? 0
-            : Math.Clamp((int)Math.Round(completedThisWeek / (double)Math.Max(weeklyAppointments, 1) * 100), 0, 100);
 
         return new DashboardSnapshot(
             TodayAppointments: events.Count(e => e.StartsAt.Date == today),
-            WeeklyUtilization: weeklyUtilization,
-            PendingRequests: events.Count(e => e.Status == AppointmentStatus.Pending),
+            WeeklyUtilization: report.Summary.WeeklyUtilization,
+            PendingRequests: report.Summary.PendingAppointments,
             TeamAvailable: activeEmployees,
             UpcomingMeetings: events.OrderBy(e => e.StartsAt).Take(5).ToList(),
             Notifications: await GetUnreadNotificationsAsync());
@@ -292,14 +278,6 @@ public sealed class ScheduleDashboardService(
         new("Lena Ortiz", "Client Success", "10:00 AM - 6:00 PM", AvailabilityStatus.TimeOff, 2)
     ];
 
-    public IReadOnlyList<ReportMetric> GetReportMetrics() =>
-    [
-        new("Daily appointments", 34, "+12%"),
-        new("Weekly utilization", 82, "+6%"),
-        new("Monthly completion", 91, "+4%"),
-        new("Average lead time", 18, "-3%")
-    ];
-
     private static string StatusColor(AppointmentStatus status) =>
         status switch
         {
@@ -523,5 +501,3 @@ public sealed record SchedulerNotification(int Id, string Title, string Message,
 }
 
 public sealed record AuditLogItem(int Id, string EntityName, string Action, string Actor, DateTime CreatedAt);
-
-public sealed record ReportMetric(string Label, int Value, string Trend);

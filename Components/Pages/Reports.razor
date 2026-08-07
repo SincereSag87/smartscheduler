@@ -1,48 +1,197 @@
 @page "/reports"
-@inject IScheduleRepository ScheduleRepository
+@rendermode InteractiveServer
+@inject IReportingService ReportingService
+@inject ITeamManagementService TeamService
 
 <section class="page-title">
     <div>
         <h1>Reports</h1>
-        <p>Daily appointments, weekly utilization, monthly trends, and employee schedule performance.</p>
+        <p>Filtered scheduling performance, utilization, cancellations, workload, and exportable appointment data.</p>
     </div>
-    <button class="btn btn-outline-primary">Export CSV</button>
+    <a class="btn btn-outline-primary" href="@ExportUrl">Export CSV</a>
 </section>
 
-<section class="ss-grid kpi-grid">
-    @foreach (var metric in ScheduleRepository.GetReportMetrics())
-    {
+<section class="ss-card mb-4">
+    <div class="form-card">
+        <div>
+            <label class="form-label" for="start-date">Start date</label>
+            <input id="start-date" type="date" class="form-control" @bind="startDate" />
+        </div>
+        <div>
+            <label class="form-label" for="end-date">End date</label>
+            <input id="end-date" type="date" class="form-control" @bind="endDate" />
+        </div>
+        <div>
+            <label class="form-label" for="department">Department</label>
+            <select id="department" class="form-select" @bind="departmentId">
+                <option value="">All departments</option>
+                @foreach (var department in departments)
+                {
+                    <option value="@department.Id">@department.Name</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="employee">Employee</label>
+            <select id="employee" class="form-select" @bind="employeeId">
+                <option value="">All employees</option>
+                @foreach (var employee in employees)
+                {
+                    <option value="@employee.Id">@employee.FullName</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label" for="status">Status</label>
+            <select id="status" class="form-select" @bind="status">
+                <option value="">All statuses</option>
+                @foreach (var appointmentStatus in Enum.GetValues<AppointmentStatus>())
+                {
+                    <option value="@appointmentStatus">@appointmentStatus</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-end">
+            <button class="btn btn-primary w-100" @onclick="LoadReport">Apply Filters</button>
+        </div>
+    </div>
+</section>
+
+@if (report is null)
+{
+    <div class="ss-card">Loading reports...</div>
+}
+else
+{
+    <section class="ss-grid kpi-grid">
+        <ReportCard Label="Daily appointments" Value="@report.Summary.DailyAppointments" Suffix="" />
+        <ReportCard Label="Weekly utilization" Value="@report.Summary.WeeklyUtilization" Suffix="%" />
+        <ReportCard Label="Monthly completion" Value="@report.Summary.MonthlyCompletion" Suffix="%" />
+        <ReportCard Label="Cancelled appointments" Value="@report.Summary.CancelledAppointments" Suffix="" />
+        <ReportCard Label="Employee workload" Value="@report.Summary.EmployeeWorkload" Suffix="" />
+    </section>
+
+    <section class="ss-grid panel-grid mt-4">
         <div class="ss-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>@metric.Label</strong>
-                <span class="pill pill-confirmed">@metric.Trend</span>
-            </div>
-            <div class="kpi-value">@metric.Value@(metric.Label.Contains("utilization") || metric.Label.Contains("completion") ? "%" : "")</div>
-            <div class="report-bar">
-                <div class="report-fill" style="width:@Math.Min(metric.Value, 100)%"></div>
+            <h2 class="h4 mb-3">Monthly Trends</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Appointments</th>
+                            <th>Completed</th>
+                            <th>Cancelled</th>
+                            <th>Utilization</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var trend in report.MonthlyTrends)
+                        {
+                            <tr>
+                                <td><strong>@trend.Month</strong></td>
+                                <td>@trend.Appointments</td>
+                                <td>@trend.Completed</td>
+                                <td>@trend.Cancelled</td>
+                                <td>
+                                    @trend.Utilization%
+                                    <div class="report-bar mt-1"><div class="report-fill" style="width:@trend.Utilization%"></div></div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
             </div>
         </div>
-    }
-</section>
 
-<section class="ss-card mt-4">
-    <h2 class="h4 mb-3">Monthly Trends</h2>
-    <div class="table-responsive">
-        <table class="table align-middle">
-            <thead>
-                <tr>
-                    <th>Month</th>
-                    <th>Appointments</th>
-                    <th>Completed</th>
-                    <th>Cancelled</th>
-                    <th>Utilization</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr><td>May</td><td>642</td><td>592</td><td>21</td><td>78%</td></tr>
-                <tr><td>June</td><td>701</td><td>649</td><td>18</td><td>81%</td></tr>
-                <tr><td>July</td><td>744</td><td>690</td><td>16</td><td>84%</td></tr>
-            </tbody>
-        </table>
-    </div>
-</section>
+        <aside class="ss-card">
+            <h2 class="h4 mb-3">Status Breakdown</h2>
+            <div class="notification-list">
+                @foreach (var item in report.StatusBreakdown)
+                {
+                    <div class="notification-row">
+                        <span class="pill @StatusClass(item.Status)">@item.Status</span>
+                        <strong>@item.Count</strong>
+                    </div>
+                }
+            </div>
+        </aside>
+    </section>
+
+    <section class="ss-grid panel-grid mt-4">
+        <div class="ss-card">
+            <h2 class="h4 mb-3">Employee Utilization</h2>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Appointments</th>
+                            <th>Completed</th>
+                            <th>Utilization</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var employee in report.EmployeeUtilization)
+                        {
+                            <tr>
+                                <td><strong>@employee.Employee</strong></td>
+                                <td>@employee.Appointments</td>
+                                <td>@employee.Completed</td>
+                                <td>
+                                    @employee.Utilization%
+                                    <div class="report-bar mt-1"><div class="report-fill" style="width:@employee.Utilization%"></div></div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <aside class="ss-card">
+            <h2 class="h4 mb-3">Department Summary</h2>
+            <div class="notification-list">
+                @foreach (var department in report.DepartmentSummaries)
+                {
+                    <div class="notification-row d-block">
+                        <strong>@department.Department</strong>
+                        <div class="muted">@department.Appointments appointments across @department.Employees employees</div>
+                        <div class="report-bar mt-2"><div class="report-fill" style="width:@department.CompletionRate%"></div></div>
+                    </div>
+                }
+            </div>
+        </aside>
+    </section>
+}
+
+@code {
+    private ReportSnapshot? report;
+    private List<Department> departments = [];
+    private List<Employee> employees = [];
+    private DateTime startDate = DateTime.Today.AddDays(-30);
+    private DateTime endDate = DateTime.Today.AddDays(30);
+    private int? departmentId;
+    private int? employeeId;
+    private AppointmentStatus? status;
+
+    private string ExportUrl =>
+        $"/reports/export.csv?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}{NullableQuery("departmentId", departmentId)}{NullableQuery("employeeId", employeeId)}{NullableQuery("status", status)}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        departments = (await TeamService.GetDepartmentsAsync()).ToList();
+        employees = (await TeamService.GetEmployeesAsync()).ToList();
+        await LoadReport();
+    }
+
+    private async Task LoadReport()
+    {
+        report = await ReportingService.GetReportAsync(new ReportFilter(startDate, endDate, departmentId, employeeId, status));
+    }
+
+    private static string NullableQuery<T>(string key, T? value) where T : struct =>
+        value is null ? string.Empty : $"&{key}={value}";
+
+    private static string StatusClass(AppointmentStatus appointmentStatus) => $"pill-{appointmentStatus.ToString().ToLowerInvariant()}";
+}
